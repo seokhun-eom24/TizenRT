@@ -38,4 +38,6 @@ int32_t arm_sin_cos_example_f32(void);
 int32_t arm_svm_example_f32(void);
 int32_t arm_variance_example_f32(void);
 
+int32_t arm_cmsis_dsp_libc_math_speed_test_example(void);
+
 #endif /* __CMSIS_DSP_H__ */

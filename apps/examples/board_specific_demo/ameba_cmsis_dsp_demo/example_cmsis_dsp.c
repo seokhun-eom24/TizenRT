@@ -73,6 +73,9 @@ static void verification_cmsis_dsp_thread(void* param)
     printf("\n-----TEST CASE : arm_variance_example_f32-----\n");
     arm_variance_example_f32();
 
+    printf("\n-----TEST CASE : arm_cmsis_dsp_libc_math_speed_test_example-----\n");
+    arm_cmsis_dsp_libc_math_speed_test_example();
+
     printf("\r\n ========== Ended Verification CMSIS_DSP ========== \r\n");
 }
 
