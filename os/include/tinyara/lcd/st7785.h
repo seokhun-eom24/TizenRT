@@ -94,6 +94,31 @@ static const lcm_setting_table_t lcd_init_cmd_g_holitech[] = {
         {REGFLAG_DELAY, 10, {}},	/* Delayms (10) */
         {REGFLAG_END_OF_TABLE, 0, {}},
 };
+
+static const lcm_setting_table_t lcd_init_cmd_g_hlt_a196[] = {
+        {0xB2, 10, {0x00, 0x0C, 0x00, 0x0C, 0x00, 0x00, 0x00, 0x33, 0x00, 0x33}}, /* Porch Setting */
+        {0x35, 2, {0x00, 0x00}},                /* Tearing Effect Line On 0x00 for The Tearing Effect output line consists of V-Blanking information only */
+        {0x36, 2, {0x00, LCD_ORIENTATION}},     /* Memory Data Access Control */
+        {0x3A, 2, {0x00, 0x55}},                /* Interface Pixel format 0x55 for RGB565 */
+        {0xB0, 2, {0x00, 0x10}},                /* RAM control 0x10 for Ram access from RGB and MIPI interface, Internal clock SYNC mode */
+        {0xB7, 2, {0x00, 0x52}},                /* Gate Control 0x52 for VGH 14.06V, VGL -8.23V */
+        {0xBB, 2, {0x00, 0x17}},                /* VCOMS Setting 0x17 for VCOMS 0.675V */
+        {0xC0, 2, {0x00, 0x2C}},                /* LCM Control 0x2C for XOR RGB setting in command 36h, XOR MX setting in command 36h, can reverse source output order and only support for RGB interface without RAM mode */
+        {0xC3, 2, {0x00, 0x0F}},                /* VRH Set for 0x0F VRH 4.3V */
+        {0xC6, 2, {0x00, 0x0F}},                /* Frame Rate Control in Normal Mode 0x0F for 60Hz FR in normal mode */
+        {0xD0, 2, {0x00, 0xA7}},                /* Power Control 1 0xA7 for startup current of charge pump circuits high power mode */
+        {0xD0, 4, {0x00, 0xA4, 0x00, 0xA1}},    /* Power Control 1 0xA4 0xA1 for startup current of charge pump circuits normar mode, AVD 6.6V, AVCL -4.8V, VDDS 2.3V */
+        {0xD6, 2, {0x00, 0xA1}},                /* Gate Output Selection in Sleep In Mode 0xA1 for GND in sleep in mode */
+        {0xE0, 28, {0x00, 0xF0, 0x00, 0x03, 0x00, 0x0A, 0x00, 0x06, 0x00, 0x07, 0x00, 0x14, 0x00, 0x32, 0x00, 0x43, 0x00, 0x49, 0x00, 0x37, 0x00, 0x12, 0x00, 0x11, 0x00, 0x2E, 0x00, 0x35}}, /* Positive Voltage Gamma Control */
+        {0xE1, 28, {0x00, 0xF0, 0x00, 0x09, 0x00, 0x0D, 0x00, 0x0C, 0x00, 0x0A, 0x00, 0x06, 0x00, 0x32, 0x00, 0x33, 0x00, 0x49, 0x00, 0x34, 0x00, 0x10, 0x00, 0x12, 0x00, 0x2C, 0x00, 0x33}}, /* Negative Voltage Gamma Control */
+        {0x21, 0, {0x00}},                      /* Display Inversion On */
+        {0x11, 0, {0x00}},                      /* Sleep out */
+        {REGFLAG_DELAY, 120, {}},               /* Delayms (120) */
+        {0x29, 0, {0x00}},                      /* Display On */
+        {REGFLAG_DELAY, 10, {}},                /* Delayms (10) */
+        {0x2C, 0, {0x00}},                      /* Memory Write */
+        {REGFLAG_END_OF_TABLE, 0, {}},
+};
 #endif
 
 #if defined(CONFIG_LCD_ST7785_TYPEA)
@@ -133,7 +158,7 @@ static const lcd_vendor_map_t g_lcd_vendors[] = {
         {0x8A8A85, lcd_init_cmd_g},                // AVD A
 #endif
 #if defined(CONFIG_LCD_ST7785_TYPEB)
-        {0x8A8A85, lcd_init_cmd_g_avd},            // AVD B
+        {0x8A8A85, lcd_init_cmd_g_hlt_a196},            // AVD B
         {0x010000, lcd_init_cmd_g_avd},            // AVD B
         {0x030000, lcd_init_cmd_g_avd},            // AVD B
         {0x484c54, lcd_init_cmd_g_holitech},  // Holitech

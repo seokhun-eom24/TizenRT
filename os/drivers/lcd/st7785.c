@@ -22,6 +22,9 @@
 
 int check_lcd_vendor_send_init_cmd(struct mipi_lcd_dev_s *priv)
 {
+	// return send_init_cmd(priv, g_lcd_vendors[1].init_cmd); //AVD
+	return send_init_cmd(priv, g_lcd_vendors[0].init_cmd); // lcd_init_cmd_g_hlt_a196
+	
 	/* Check Vendor */
 	lcm_setting_table_t read_display_cmd = {0x04, 0, {0x00}};
 	uint8_t rxbuf[3] = {0xFF, 0xFF, 0xFF};
@@ -30,21 +33,23 @@ int check_lcd_vendor_send_init_cmd(struct mipi_lcd_dev_s *priv)
 	int status;
 	status = set_return_packet_len(priv, length);
 	if (status != OK) {
+		lldbg("ERROR set_return_packet_len");
 		return status;
 	}
 	status = read_response(priv, read_display_cmd, rxbuf, length);
 	if (status != OK) {
+		lldbg("ERROR read_response");
 		return status;
 	}
 	combined_id = (rxbuf[0] << 16) | (rxbuf[1] << 8) | rxbuf[2];
 
-	lcddbg("LCD ID: %6x\n", combined_id);
+	lldbg("LCD ID: %6x\n", combined_id);
 
 	for (int i = 0; i < NUM_LCD_VENDORS; i++) {
 		if (combined_id == g_lcd_vendors[i].id) {
 			return send_init_cmd(priv, g_lcd_vendors[i].init_cmd);
 		}
 	}
-	lcddbg("LCD ST7785 not recognized\n");
+	lldbg("LCD ST7785 not recognized\n");
 	return ERROR;
 }

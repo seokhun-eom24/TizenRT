@@ -238,7 +238,7 @@ static void rtl8730e_control_backlight(uint8_t level)
 #if defined(CONFIG_LCD_ST7701SN)
 	pwmout_write(&g_rtl8730e_config_dev_s.pwm_led, 1.0-pwm_level);
 #elif defined(CONFIG_LCD_ST7785)
-	pwmout_write(&g_rtl8730e_config_dev_s.pwm_led, pwm_level);
+	pwmout_write(&g_rtl8730e_config_dev_s.pwm_led, pwm_level); // 반전이면 수정 필요
 #endif
 	g_rtl8730e_config_dev_s.pwm_level = level;
 }
