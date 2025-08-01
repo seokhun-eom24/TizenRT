@@ -38,6 +38,12 @@ struct s_buffer {
 	unsigned char *out_buffer;
 };
 
+static struct comp_ctx {
+	int fd;
+	struct s_header *compression_header;
+	struct s_buffer buffers;
+};
+
 /****************************************************************************
  * Function Prototypes
  ****************************************************************************/
@@ -51,7 +57,7 @@ struct s_buffer {
  * Returned Value:
  *   None
  ****************************************************************************/
-void compress_uninit(void);
+void compress_uninit(int filfd);
 
 /****************************************************************************
  * Name: compress_init
@@ -86,6 +92,6 @@ int compress_read(int filfd, uint16_t binary_header_size, FAR uint8_t *buffer, s
  * Returned Value:
  *   Address of the compression_header
  ****************************************************************************/
-struct s_header *get_compression_header(void);
+struct s_header *get_compression_header(int filfd);
 
 #endif							/* __INCLUDE_COMPRESS_READ_H */
