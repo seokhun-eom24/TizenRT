@@ -54,7 +54,7 @@ static int pm_sleep_test(void *args)
 
 	int fd = open(PM_DRVPATH, O_WRONLY);
 	if (fd < 0) {
-		printf("Fail to open pm sleep(errno %d)", get_errno());
+		printf("Fail to open pm driver(errno %d)", get_errno());
 		return -1;
 	}
 
@@ -75,7 +75,7 @@ static void _pm_suspend(char *name)
 	int domain_id;
 	int fd = open(PM_DRVPATH, O_WRONLY);
 	if (fd < 0) {
-		printf("Fail to open pm(errno %d)", get_errno());
+		printf("Fail to open pm driver(errno %d)", get_errno());
 		return;
 	}
 	domain_arg.domain_name = name;
@@ -98,7 +98,7 @@ static void _pm_resume(char *name)
 	int domain_id;
 	int fd = open(PM_DRVPATH, O_WRONLY);
 	if (fd < 0) {
-		printf("Fail to open pm(errno %d)", get_errno());
+		printf("Fail to open pm driver(errno %d)", get_errno());
 		return;
 	}
 	domain_arg.domain_name = name;
@@ -123,7 +123,7 @@ static int pm_suspend_resume_test(void)
 	int test_count = 0;
 	int fd = open(PM_DRVPATH, O_WRONLY);
 	if (fd < 0) {
-		printf("Fail to open pm(errno %d)", get_errno());
+		printf("Fail to open pm driver(errno %d)", get_errno());
 		return -1;
 	}
 
@@ -158,22 +158,13 @@ static int start_pm_test(int argc, char *argv[])
 	pthread_t suspend_resume_tid = 0;
 	pthread_t pm_sleep_tid = 0;
 	int ret;
-	int fd;
 	bool suspend_resume_test = false;
 	bool timed_wakeup_test = false;
 	int timed_wakeup_time = 100;  // 100 ms
 
-	printf("######################### PM LONG TERM TEST START #########################\n");
-
-	fd = open(PM_DRVPATH, O_WRONLY);
-	if (fd < 0) {
-		printf("Fail to open pm start(errno %d)", get_errno());
-		return -1;
-	}
-
-	if(ioctl(fd, PMIOC_START, 0) < 0) {
-		printf("Fail to pm start(errno %d)\n", get_errno());
-		close(fd);
+	ret = _pm_start();
+	if (ret < 0) {
+		printf("Fail to start pm(errno %d)\n", get_errno());
 		return -1;
 	}
 
@@ -192,7 +183,6 @@ static int start_pm_test(int argc, char *argv[])
 	if (suspend_resume_test) {
 		if (pthread_create(&suspend_resume_tid, NULL, (pthread_startroutine_t)pm_suspend_resume_test, NULL) < 0) {
 			printf("Failed to create suspend test pthread(%d):\n", get_errno());
-			close(fd);
 			return -1;
 		}
 	}
@@ -203,7 +193,6 @@ static int start_pm_test(int argc, char *argv[])
 			if (suspend_resume_test) {
 				pthread_cancel(suspend_resume_tid);
 			}
-			close(fd);
 			return -1;
 		}
 		pthread_setname_np(pm_sleep_tid, "pm_sleep_test");
@@ -223,8 +212,47 @@ static int start_pm_test(int argc, char *argv[])
 		}
 	}
 
+	return 0;
+}
+
+static int _pm_start(void)
+{
+	int fd;
+
+	fd = open(PM_DRVPATH, O_WRONLY);
+	if (fd < 0) {
+		printf("Fail to open pm driver(errno %d)", get_errno());
+		return -1;
+	}
+
+	if (ioctl(fd, PMIOC_START, 0) < 0) {
+		printf("Fail to pm start(errno %d)\n", get_errno());
+		close(fd);
+		return -1;
+	}
+
 	close(fd);
-	printf("######################### PM LONG TERM TEST END #########################\n");
+
+	return 0;
+}
+
+static int _pm_stop(void)
+{
+	int fd;
+
+	fd = open(PM_DRVPATH, O_WRONLY);
+	if (fd < 0) {
+		printf("Fail to open pm driver(errno %d)", get_errno());
+		return -1;
+	}
+
+	if (ioctl(fd, PMIOC_STOP, 0) < 0) {
+		printf("Fail to pm stop(errno %d)\n", get_errno());
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
 
 	return 0;
 }
@@ -259,6 +287,7 @@ int power_main(int argc, char *argv[])
 #endif
 {
 	int pid;
+    int ret;
 
 	if (argc < 2 || strncmp(argv[1], "help", 5) == 0) {
 		help_func();
@@ -272,23 +301,26 @@ int power_main(int argc, char *argv[])
 		}
 
 		is_running = true;
-
 		pid = task_create("start_pm_test", 100, 1024, start_pm_test, argv + 1);
 		if (pid < 0) {
 			printf("Fail to create start_pm_test task(errno %d)\n", get_errno());
 			is_running = false;
 			return -1;
 		}
-
-
+		printf("######################### PM LONG TERM TEST START #########################\n");
 	} else if (strncmp(argv[1], "stop", 5) == 0) {
 		if (!is_running) {
 			printf("power test is not running\n");
 			return 0;
 		}
 
+		ret = _pm_stop();
+		if (ret < 0) {
+			printf("Fail to stop pm(errno %d)\n", get_errno());
+			return -1;
+		}
+		printf("######################### PM LONG TERM TEST END #########################\n");
 		is_running = false;
-
 	} else if (strncmp(argv[1], "suspend", 8) == 0 && argc == 3) {
 		_pm_suspend(argv[2]);
 		printf("Done pm suspend domain: %s\n", argv[2]);
