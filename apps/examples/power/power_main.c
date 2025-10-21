@@ -45,7 +45,9 @@
  * Private Functions
  ****************************************************************************/
 
-static int is_running;
+static int is_running = false;
+pthread_t suspend_resume_tid = 0;
+pthread_t pm_sleep_tid = 0;
 
 
 static int pm_sleep_test(void *args)
@@ -153,20 +155,48 @@ static int pm_suspend_resume_test(void)
 	return 0;
 }
 
-static int start_pm_test(int argc, char *argv[])
+static int _pm_start(void)
 {
-	pthread_t suspend_resume_tid = 0;
-	pthread_t pm_sleep_tid = 0;
+	int
+
+	fd = open(PM_DRVPATH, O_WRONLY);
+	if (fd < 0) {
+		printf("Fail to open pm driver(errno %d)", get_errno());
+		return -1;
+	}
+
+	if (ioctl(fd, PMIOC_START, 0) < 0) {
+		printf("Fail to pm start(errno %d)\n", get_errno());
+		close(fd);
+		return -1;
+	}
+
+	close(fd);
+
+	return 0;
+}
+
+static void start_pm_test(int argc, char *argv[])
+{
 	int ret;
+	int fd;
 	bool suspend_resume_test = false;
 	bool timed_wakeup_test = false;
 	int timed_wakeup_time = 100;  // 100 ms
 
+	if (is_running) {
+		printf("power test is already running\n");
+		return;
+	}
+
+	is_running = true;
+
 	ret = _pm_start();
 	if (ret < 0) {
-		printf("Fail to start pm(errno %d)\n", get_errno());
-		return -1;
+		return;
 	}
+
+	printf("agrc: %d, argv[2]: %s\n", argc, argv);
 
 	for (int i = 1; i < argc; i++) {
 		if (strncmp(argv[i], "--lock-test", 12) == 0 || strncmp(argv[i], "-l", 3) == 0) {
@@ -185,6 +215,7 @@ static int start_pm_test(int argc, char *argv[])
 			printf("Failed to create suspend test pthread(%d):\n", get_errno());
 			return -1;
 		}
+		pthread_setname_np(suspend_resume_tid, "pm_suspend_resume_test");
 	}
 
 	if (timed_wakeup_test) {
@@ -198,40 +229,7 @@ static int start_pm_test(int argc, char *argv[])
 		pthread_setname_np(pm_sleep_tid, "pm_sleep_test");
 	}
 
-	if (suspend_resume_test) {
-		ret = pthread_join(suspend_resume_tid, NULL);
-		if (ret != 0) {
-			printf("Fail to join suspend_resume_tid thread(%d):\n", ret);
-		}
-	}
-
-	if (timed_wakeup_test) {
-		ret = pthread_join(pm_sleep_tid, NULL);
-		if (ret != 0) {
-			printf("Fail to join pm_sleep_tid thread(%d):\n", ret);
-		}
-	}
-
-	return 0;
-}
-
-static int _pm_start(void)
-{
-	int fd;
-
-	fd = open(PM_DRVPATH, O_WRONLY);
-	if (fd < 0) {
-		printf("Fail to open pm driver(errno %d)", get_errno());
-		return -1;
-	}
-
-	if (ioctl(fd, PMIOC_START, 0) < 0) {
-		printf("Fail to pm start(errno %d)\n", get_errno());
-		close(fd);
-		return -1;
-	}
-
-	close(fd);
+	printf("######################### PM LONG TERM TEST START #########################\n");
 
 	return 0;
 }
@@ -255,6 +253,47 @@ static int _pm_stop(void)
 	close(fd);
 
 	return 0;
+}
+
+static void stop_pm_test(void)
+{
+	int ret;
+	int timed_wakeup_time = 100;  // 100 ms
+
+	if (!is_running) {
+		printf("power test is not running\n");
+		return;
+	}
+
+	ret = _pm_stop();
+	if (ret < 0) {
+		return;
+	}
+
+	if (suspend_resume_tid) {
+		ret = pthread_join(suspend_resume_tid, NULL);
+		if (ret != 0) {
+			printf("Fail to join suspend_resume_tid thread(%d):\n", ret);
+		}
+		else {
+			suspend_resume_tid = 0;
+		}
+	}
+
+	if (pm_sleep_tid != 0) {
+		ret = pthread_join(pm_sleep_tid, NULL);
+		if (ret != 0) {
+			printf("Fail to join pm_sleep_tid thread(%d):\n", ret);
+		}
+		else {
+			pm_sleep_tid = 0;
+		}
+	}
+
+	printf("######################### PM LONG TERM TEST END #########################\n");
+	is_running = false;
+
+	return;
 }
 
 static void help_func(void)
@@ -286,41 +325,15 @@ int main(int argc, FAR char *argv[])
 int power_main(int argc, char *argv[])
 #endif
 {
-	int pid;
-    int ret;
-
 	if (argc < 2 || strncmp(argv[1], "help", 5) == 0) {
 		help_func();
 		return 0;
 	}
 
 	if (strncmp(argv[1], "start", 6) == 0) {
-		if (is_running) {
-			printf("power test is already running\n");
-			return 0;
-		}
-
-		is_running = true;
-		pid = task_create("start_pm_test", 100, 1024, start_pm_test, argv + 1);
-		if (pid < 0) {
-			printf("Fail to create start_pm_test task(errno %d)\n", get_errno());
-			is_running = false;
-			return -1;
-		}
-		printf("######################### PM LONG TERM TEST START #########################\n");
+		start_pm_test(argc - 2, argv + 2);
 	} else if (strncmp(argv[1], "stop", 5) == 0) {
-		if (!is_running) {
-			printf("power test is not running\n");
-			return 0;
-		}
-
-		ret = _pm_stop();
-		if (ret < 0) {
-			printf("Fail to stop pm(errno %d)\n", get_errno());
-			return -1;
-		}
-		printf("######################### PM LONG TERM TEST END #########################\n");
-		is_running = false;
+		stop_pm_test();
 	} else if (strncmp(argv[1], "suspend", 8) == 0 && argc == 3) {
 		_pm_suspend(argv[2]);
 		printf("Done pm suspend domain: %s\n", argv[2]);
