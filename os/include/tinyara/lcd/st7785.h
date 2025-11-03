@@ -130,7 +130,7 @@ static const lcm_setting_table_t lcd_init_cmd_g_hlt_a196[] = {
 	{0x35, 2, {0x00, 0x00}},													/* Tearing Effect Line On 0x00 for The Tearing Effect output line consists of V-Blanking information only */
 	{0x36, 2, {0x00, LCD_ORIENTATION}},											/* Memory Data Access Control */
 	{0x3A, 2, {0x00, 0x55}},													/* Interface Pixel format 0x55 for RGB565 */
-	{0xB0, 2, {0x00, 0x11}},													/* RAM control 0x11 for Ram access from RGB and MIPI interface, Display SYNC: RGB Interface DOTCLK SYNC mode */
+	{0xB0, 2, {0x00, 0x10}},													/* RAM control 0x11 for Ram access from RGB and MIPI interface, Display SYNC: RGB Interface DOTCLK SYNC mode */
 	{0xB7, 2, {0x00, 0x52}},													/* Gate Control 0x52 for VGH 14.06V, VGL -8.23V */
 	{0xBB, 2, {0x00, 0x17}},													/* VCOMS Setting 0x17 for VCOMS 0.675V */
 	{0xC0, 2, {0x00, 0x2C}},													/* LCM Control 0x2C for XOR RGB setting in command 36h, XOR MX setting in command 36h, can reverse source output order and only support for RGB interface without RAM mode */

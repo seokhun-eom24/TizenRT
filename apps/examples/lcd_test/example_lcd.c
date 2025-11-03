@@ -223,7 +223,8 @@ static void test_put_area_pattern(void)
 	printf("xres : %d, yres:%d\n", xres, yres);
 	close(fd);
 	putarea(0, yres - 1, 0, xres - 1, BLUE);
-	sleep(3);
+	sleep(30);
+	printf("after 30\n");
 	putarea(0, yres - 1, 0, xres - 1, GREEN);
 	sleep(3);
 	putarea(0, yres - 1, 0, xres - 1, RED);

@@ -141,7 +141,7 @@
 #define         PWR_PIN_12	{_PA_12,		GPIO_PuPd_DOWN,			GPIO_PuPd_DOWN}	// RTL8730ELH
 #define         PWR_PIN_13	{_PA_13,		GPIO_PuPd_UP,			GPIO_PuPd_UP}	// RTK SWD_DATA
 #define         PWR_PIN_14	{_PA_14,		GPIO_PuPd_UP,			GPIO_PuPd_UP}	// RTK SWD_CLK
-#define         PWR_PIN_15	{_PA_15,		GPIO_PuPd_DOWN,			GPIO_PuPd_DOWN}	// SDA pull down 4.7k
+#define         PWR_PIN_15	{_PA_15,		GPIO_PuPd_KEEP,			GPIO_PuPd_KEEP}	// SDA pull down 4.7k
 #define         PWR_PIN_16	{_PA_16,		GPIO_PuPd_NOPULL,		GPIO_PuPd_NOPULL}	// RTK QA board need pull up
 #define         PWR_PIN_17	{_PA_17,		GPIO_PuPd_DOWN,			GPIO_PuPd_DOWN}	// NA
 #define         PWR_PIN_18	{_PA_18,		GPIO_PuPd_UP,			GPIO_PuPd_DOWN}	// NA
@@ -170,7 +170,7 @@
 #define         PWR_PIN_41	{_PB_9,			GPIO_PuPd_UP,			GPIO_PuPd_DOWN}	// RTL8730ELH
 #define         PWR_PIN_42	{_PB_10,		GPIO_PuPd_NOPULL,		GPIO_PuPd_NOPULL}	// SDA AMP-I2S
 #define         PWR_PIN_43	{_PB_11,		GPIO_PuPd_UP,			GPIO_PuPd_UP}	// SDA AILite+W LCD PWN
-#define         PWR_PIN_44	{_PB_12,		GPIO_PuPd_UP,			GPIO_PuPd_DOWN}	// RTL8730ELH
+#define         PWR_PIN_44	{_PB_12,		GPIO_PuPd_KEEP,			GPIO_PuPd_KEEP}	// RTL8730ELH
 #define         PWR_PIN_45	{_PB_13,		GPIO_PuPd_UP,			GPIO_PuPd_DOWN}	// RTL8730ELH
 #define         PWR_PIN_46	{_PB_14,		GPIO_PuPd_UP,			GPIO_PuPd_DOWN}	// RTL8730ELH
 #define         PWR_PIN_47	{_PB_15,		GPIO_PuPd_UP,			GPIO_PuPd_DOWN}	// RTL8730ELH

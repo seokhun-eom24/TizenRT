@@ -296,7 +296,7 @@ static int lcddev_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 		if (old_power == 0 && new_power > 0) {
 			lcddbg("Lock pm & silent reboot\n");
 			silent_reboot_lock();
-			(void)pm_suspend(priv->pm_domain);
+			// (void)pm_suspend(priv->pm_domain);
 		}
 
 		ret = priv->dev->setpower(priv->dev, new_power);
@@ -487,7 +487,7 @@ int lcddev_register(struct lcd_dev_s *dev)
 	ret = lcd_init_put_image(dev);
 	if (ret == OK) { // LCD ON
 #ifdef CONFIG_PM
-		(void)pm_suspend(lcd_info->pm_domain);
+		// (void)pm_suspend(lcd_info->pm_domain);
 #endif
 		silent_reboot_lock();
 	}

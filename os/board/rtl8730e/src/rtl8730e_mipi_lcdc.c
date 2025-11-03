@@ -144,6 +144,7 @@ static void rtl8730e_lcd_init(void)
 
 static void rtl8730e_lcd_power_off(void)
 {
+	lcddbg("rtl8730e_lcd_power_off\n");
 	InterruptDis(lcdc_irq_info.num);
 	if (lcdc_nextframe == 1) {
 		lcdc_nextframe = 0;
@@ -153,11 +154,13 @@ static void rtl8730e_lcd_power_off(void)
 }
 static void rtl8730e_lcd_power_on(void)
 {
+	lcddbg("rtl8730e_lcd_power_on\n");
 	GPIO_WriteBit(MIPI_GPIO_RESET_PIN, PIN_HIGH);
 	DelayMs(140);  // additional time needed for the panel to stabilize and accept commands 
 }
 static void rtl8730e_gpio_reset(void)
 {
+	lcddbg("rtl8730e_gpio_reset\n");
 	GPIO_WriteBit(MIPI_GPIO_RESET_PIN, PIN_HIGH);
 	DelayMs(10);
 	GPIO_WriteBit(MIPI_GPIO_RESET_PIN, PIN_LOW);
