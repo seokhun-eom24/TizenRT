@@ -55,6 +55,11 @@
  ****************************************************************************/
 
 #include <tinyara/config.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+#include <tinyara/watchdog.h>
+#include <tinyara/sched.h>
+#include <tinyara/irq.h>
 #include <stdio.h>
 
 /****************************************************************************
@@ -67,6 +72,21 @@ int main(int argc, FAR char *argv[])
 int hello_main(int argc, char *argv[])
 #endif
 {
-	printf("Hello, World!!\n");
+	int fd = open(CONFIG_WATCHDOG_DEVPATH, O_RDWR);
+	if (fd < 0) {
+		printf("failed to open watchdog device\n");
+		return -1;
+	}
+
+	ioctl(fd, WDIOC_SETTIMEOUT, 1000);
+	ioctl(fd, WDIOC_START, 0);
+
+	printf("Hello, World 1\n");
+
+	// block system for watchdog reset
+	enter_critical_section();
+	sched_lock();
+	for(;;){}
+	printf("Hello, World 2\n");
 	return 0;
 }

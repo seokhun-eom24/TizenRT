@@ -52,7 +52,7 @@
  * Private data
  ****************************************************************************/
 /* Default security_level value: high */
-static int security_level = HIGH_SECURITY_LEVEL;
+static int security_level = LOW_SECURITY_LEVEL;
 
 /****************************************************************************
  * Private Functions

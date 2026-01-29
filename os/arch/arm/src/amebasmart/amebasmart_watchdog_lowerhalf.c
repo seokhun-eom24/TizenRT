@@ -63,6 +63,13 @@
 
 #ifdef CONFIG_WATCHDOG
 
+/****************************************************************************
+ * External Declarations for HAL functions
+ ****************************************************************************/
+extern WDG_TypeDef *WDGDev;
+extern void WDG_ClearINT(WDG_TypeDef *WDG, u32 INTrBit);
+extern void WDG_INTConfig(WDG_TypeDef *WDG, u32 WDG_IT, u32 NewState);
+
 #define WDT_STOP	0
 #define WDT_START	1
 #define WDT_PAUSE	2
@@ -112,6 +119,22 @@ const struct watchdog_ops_s g_wdgops = {
 /****************************************************************************
  * Private Functions
  ****************************************************************************/
+
+/****************************************************************************
+ * Name: amebasmart_wdg_early_int_handler
+ *
+ ****************************************************************************/
+static u32 amebasmart_wdg_early_int_handler(void *arg)
+{
+	WDG_INTConfig(WDG_DEV, WDG_BIT_EIE, DISABLE);
+    WDG_ClearINT(WDG_DEV, WDG_BIT_EIC);
+    WDG_ClearINT(WDG_DEV, WDG_BIT_EIC);//remember to clear twice for wdg run slower
+
+	lldbg_noarg("WATCHDOG EARLY INTERRUPT - System will reset in ~100ms\n");
+
+	return 0;
+}
+
 /****************************************************************************
  * Name: amebsmart_wdg_start
  *
@@ -443,12 +466,14 @@ int amebasmart_wdg_initialize(const char *devpath, uint32_t timeout_ms)
 	/* Set the priv to default */
 	priv->ops = &g_wdgops;
 	priv->handler = NULL;
+	priv->timeout_ms = timeout_ms;
 
 	/* Initializes the watchdog, include time setting, mode register */
 	watchdog_init(timeout_ms);
 	priv->wdt_status = WDT_STOP;
 	priv->int_mode = false;
 
+	watchdog_irq_init(amebasmart_wdg_early_int_handler, (uint32_t)priv);
 	/* Register the watchdog driver as /dev/wdgX. */
 	if (!watchdog_register(devpath, (FAR struct watchdog_lowerhalf_s *)priv)) {
 		/*
