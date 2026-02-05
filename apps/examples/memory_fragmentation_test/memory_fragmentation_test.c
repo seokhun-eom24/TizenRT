@@ -18,312 +18,274 @@
 
 /// @file memory_fragmentation_test.c
 
-/// @brief Intentionally allocate/free small and large memory segments in a mixed-up manner.
+/// @brief Heap stress test for memory fragmentation measurement.
+///        Allocates and frees memory blocks with realistic size distribution
+///        to simulate real-world memory usage patterns.
 
 /****************************************************************************
  * Included Files
  ****************************************************************************/
+
 #include <tinyara/config.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
+#ifdef CONFIG_DEBUG_MM_HEAPINFO
+#include <tinyara/mm/mm.h>
+#include <tinyara/fs/ioctl.h>
+#include <tinyara/mminfo.h>
+#endif
 
-/* The number of memory sizes we are handling.
- * Here, we have 12 different memory sizes: 2^4, 2^5, ... , 2^(MAX_SIZE_EXPONENT + 3)
- */
-#define MAX_SIZE_EXPONENT 12
+/****************************************************************************
+ * Pre-processor Definitions
+ ****************************************************************************/
 
-/* We consider the first NUMOF_SMALL_MEMORY sizes as relatively small memory.
- * That is, the sizes of 2^4 ~ 2^8 are considered as small memory.
- */
-#define NUMOF_SMALL_MEMORY 5
+#define MEMFRAG_TRACK_BYTES 131072	/* 128KB for 5000+ entries */
 
-/* Seed for random number */
-#define SEED 1
+#define MEMFRAG_WEIGHT_SMALL 85
+#define MEMFRAG_WEIGHT_MEDIUM 12
+#define MEMFRAG_WEIGHT_LARGE 3
 
-/* Data structure to store allocated memory segments */
-struct alloc_list {
-	char *data;
-	struct alloc_list *next;
-	struct alloc_list *prev;
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+
+/****************************************************************************
+ * Private Types
+ ****************************************************************************/
+
+struct memfrag_alloc_entry {
+	void *ptr;
+	size_t size;
 };
 
-static bool memory_allocation(struct alloc_list list[], int numof_size[], int num_alloc[])
+/****************************************************************************
+ * Private Data
+ ****************************************************************************/
+
+static struct memfrag_alloc_entry *g_entries;
+static int g_capacity;
+static int g_active_count;
+static size_t g_active_bytes;
+static uint32_t g_prng_state = 1;
+
+static const size_t g_sizes_small[] = {
+	36, 36, 36, 36, 36, 36, 36, 36,	/* 36 is dominant (308k occurrences) */
+	24, 24, 16, 16, 40, 40,
+	8, 33, 48, 47, 56, 12, 13,
+	23, 20, 26, 27, 28, 30, 32, 52, 64
+};
+
+static const size_t g_sizes_medium[] = {
+	120, 120, 108, 108,	/* 120: 1019, 108: 816 occurrences */
+	128, 129, 256, 316,
+	512, 612, 1018, 1024
+};
+
+static const size_t g_sizes_large[] = {
+	1796, 1936, 1952, 1968, 2048,
+	4096, 4096, 4688, 5120,
+	8192, 10240, 16384, 32768,
+	64000, 98795, 131072, 262144,
+	307202, 319296, 512000
+};
+
+/****************************************************************************
+ * Private Functions
+ ****************************************************************************/
+
+static uint32_t pseudo_random(void)
 {
-	struct alloc_list *next[MAX_SIZE_EXPONENT];
-	struct alloc_list *item;
-	int max_interval;
-	int i;
-	int interval[MAX_SIZE_EXPONENT] = {0, };
-	int cur_interval[MAX_SIZE_EXPONENT] = {0, };
-
-	/* Calculate the maximum allocation count. */
-	max_interval = numof_size[0];
-	for (i = 1; i < MAX_SIZE_EXPONENT; ++i) {
-		if (numof_size[i] > max_interval) {
-			max_interval = numof_size[i];
-		}
-	}
-
-	/* Move 'next' pointer to the end of list to add a new item from the tail */
-	for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-		next[i] = &list[i];
-		while (next[i]->next) {
-			next[i] = next[i]->next;
-		}
-	}
-
-	/* Calculate the interval of allocation per size. */
-	for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-		if (numof_size[i] > 0) {
-			interval[i] = cur_interval[i] = max_interval / numof_size[i];
-		} else if (numof_size[i] == 0) {
-			interval[i] = cur_interval[i] = max_interval + 1;
-		} else {
-			printf("Invalid number of memory allocation with size %d\n", (1 << (i + 4)));
-			printf("It should be a positive number.\n");
-			return false;
-		}
-	}
-
-	/* Allocating each memory segment whenever its interval is zero */
-	while (max_interval > 0) {
-		for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-			if (cur_interval[i] == 0) {
-				if (num_alloc[i] >= numof_size[i]) {
-					cur_interval[i] = interval[i] - 1;
-					continue;
-				}
-					
-				item = (struct alloc_list *)malloc(sizeof(struct alloc_list));
-				if (item) {
-					item->data = (char *)malloc((1 << (i + 4) * sizeof(char)));
-					/* add a new item at the tail */
-					if (item->data) {
-						item->next = NULL;
-						item->prev = next[i];
-						next[i]->next = item;
-						next[i] = item;
-						++num_alloc[i];
-					} else {
-						free(item);
-						printf("Size %d's %d-th allocation failed.\n", 1 << (i + 4), num_alloc[i]);
-						printf("Too many memory allocations were tried.\n");
-						return false;
-					}
-				} else {
-					printf("Size %d's %d-th allocation failed.\n", 1 << (i + 4), num_alloc[i]);
-					printf("Too many memory allocations were tried.\n");
-					return false;
-				}
-				cur_interval[i] = interval[i] - 1;
-			} else {
-				--cur_interval[i];
-			}
-		}
-		--max_interval;
-	}
-
-	return true;
+	g_prng_state = g_prng_state * 1103515245u + 12345u;
+	return g_prng_state;
 }
 
-static bool memory_free(int num[], int num_alloc[], struct alloc_list list[])
+static void memfrag_set_seed(uint32_t seed)
 {
-	struct alloc_list *temp;
-	int num_free[MAX_SIZE_EXPONENT];
-	int i;
-
-	for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-		num_free[i] = num[i];
+	if (seed == 0) {
+		seed = 1;
 	}
-
-	for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-		while (num_free[i]) {
-			temp = list[i].next;
-			if (temp) {
-				temp->prev->next = temp->next;
-				if (temp->next) {
-					temp->next->prev = temp->prev;
-				} 
-				free(temp->data);
-				free(temp);
-				--num_alloc[i];
-			} else {
-				return false;
-			}
-			--num_free[i];
-		}
-	}
-
-	return true;
+	g_prng_state = seed;
 }
 
-static void memory_cleanup(int num_alloc[], struct alloc_list list[])
+static size_t memfrag_select_size(void)
 {
-	int i;
-	int j;
-	struct alloc_list *item;
-	struct alloc_list *next[MAX_SIZE_EXPONENT];
-
-	/* Free all the memory */
-	for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-		next[i] = list[i].next;
+	uint32_t r = pseudo_random() % 100;
+	if (r < MEMFRAG_WEIGHT_SMALL) {
+		return g_sizes_small[pseudo_random() % ARRAY_SIZE(g_sizes_small)];
 	}
-	for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-		while (next[i]) {
-			item = next[i];
-			free(item->data);
-			next[i] = next[i]->next;
-			free(item);
-			--num_alloc[i];
-		}
+	if (r < (MEMFRAG_WEIGHT_SMALL + MEMFRAG_WEIGHT_MEDIUM)) {
+		return g_sizes_medium[pseudo_random() % ARRAY_SIZE(g_sizes_medium)];
 	}
-
-	i = 0;
-	for (j = 0; j < MAX_SIZE_EXPONENT; ++j) {
-		i += num_alloc[j];
-	}
-
-	if (i == 0) {
-		printf("All the memory is released.\n");
-	} else {
-		printf("All the memeory can't be released. # of allocation: %d\n", i);
-		for (j = 0; j < MAX_SIZE_EXPONENT; ++j) {
-			if (num_alloc[j] > 0) {
-				printf("%d [Bytes] : %d\n", 1 << (j + 4), num_alloc[j]);
-			}
-		}
-	}
+	return g_sizes_large[pseudo_random() % ARRAY_SIZE(g_sizes_large)];
 }
 
-static void print_usage(void)
-{
-	printf("Usage: memfrag param1 param2 repeat\n");
-	printf("       'param1' and 'param2' should range [1-9].\n");
-	printf("       'param1/10' and 'param2/10' portions of initial small and large memory allocations, respectively,\n");
-	printf("       are released and allocated repeatedly 'repeat' times.\n");
-	printf("       Initial numbers of memory allocations are given inside the source code.\n");
-	printf("       If you want to change these values, modify the values of the array called 'numof_size'.\n");
-	exit(-1);
-}
-
-static int memory_fragmentation_test(int argc, char *argv[])
+static void memfrag_cleanup_allocations(void)
 {
 	int i;
-	int j;
-	int f1;
-	int f2;
-	int r;
-	int num_alloc[MAX_SIZE_EXPONENT] = {0, };
-	int num_alloc_tmp[MAX_SIZE_EXPONENT] = {0, };
-	int num_free[MAX_SIZE_EXPONENT] = {0, };
-	struct alloc_list list[MAX_SIZE_EXPONENT];
 
-	/* The number of memory segments whose size is 2^(i+4) where i is the index
-	 * of the arrary of numof_size[].
-	 * The following data was derived from the memory usage of the DA easy-setup
-	 * when MAX_SIZE_EXPONENT is 12.
-	 */
-	// DA easy-setup memory usage 
-	//int numof_size[MAX_SIZE_EXPONENT] = {57, 809, 561, 74, 57, 90, 17, 8, 11, 15, 4, 9};
-	// Three small memory sizes and two large memory sizes
-	int numof_size[MAX_SIZE_EXPONENT] = {700, 300, 200, 0, 0, 0, 0, 0, 70, 50, 0, 0}; 
-
-	for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-		list[i].data = NULL;
-		list[i].next = NULL;
-		list[i].prev = NULL;
+	if (!g_entries) {
+		return;
 	}
 
-	if (argc < 4) {
-		print_usage();
+	/* Compact approach: active entries are always at indices 0..g_active_count-1 */
+	for (i = 0; i < g_active_count; i++) {
+		free(g_entries[i].ptr);
+		g_entries[i].ptr = NULL;
+		g_entries[i].size = 0;
 	}
 
-	f1 = strtol(argv[2], (char **)NULL, 10);
-	if ((f1 < 1) || (f1 > 9)) {
-		print_usage();
+	g_active_count = 0;
+	g_active_bytes = 0;
+}
+
+static int memfrag_init_table(uint32_t seed, bool set_seed)
+{
+	int capacity;
+
+	if (g_entries) {
+		memfrag_cleanup_allocations();
+		free(g_entries);
+		g_entries = NULL;
+		g_capacity = 0;
 	}
 
-	f2 = strtol(argv[3], (char **)NULL, 10);
-	if ((f2 < 1) || (f2 > 9)) {
-		print_usage();
+	g_entries = (struct memfrag_alloc_entry *)malloc(MEMFRAG_TRACK_BYTES);
+	if (!g_entries) {
+		printf("init: failed to allocate tracking table (%d bytes)\n", MEMFRAG_TRACK_BYTES);
+		return -1;
 	}
 
-	r = strtol(argv[4], (char **)NULL, 10);
-	if (r < 0) {
-		print_usage();
+	memset(g_entries, 0, MEMFRAG_TRACK_BYTES);
+	capacity = (int)(MEMFRAG_TRACK_BYTES / sizeof(struct memfrag_alloc_entry));
+	if (capacity <= 0) {
+		free(g_entries);
+		g_entries = NULL;
+		printf("init: tracking table too small\n");
+		return -1;
 	}
 
-	srand(SEED);
+	g_capacity = capacity;
+	g_active_count = 0;
+	g_active_bytes = 0;
 
-	/* Allocate memory according to 'numof_size' */
-	if (memory_allocation(list, numof_size, num_alloc) == false) {
-		printf("memory_allocation failed!\n");
-		memory_cleanup(num_alloc, list);
-		return 0;
+	if (set_seed) {
+		memfrag_set_seed(seed);
 	}
 
-	/* Free the number of memory allocation according to 'num_free' 
-	 * with a first-come first-free manner.
-	 */
-	printf("Test Configuration:\n");
-	printf("Size [bytes]	# of init alloc		# of free\n");
-	for (i = 0; i < NUMOF_SMALL_MEMORY; ++i) {
-		num_free[i] = num_alloc[i] * f1 / 10;
-		if (num_alloc[i] > 0) {
-			printf("%d		%d			%d\n", 1 << (i + 4), num_alloc[i], num_free[i]);
-		}
-	}
-	for (i = NUMOF_SMALL_MEMORY; i < MAX_SIZE_EXPONENT; ++i) {
-		num_free[i] = num_alloc[i] * f2 / 10;
-		if (num_alloc[i] > 0) {
-			printf("%d		%d			%d\n", 1 << (i + 4), num_alloc[i], num_free[i]);
-		}
-	}
-	if (memory_free(num_free, num_alloc, list) == false) {
-		printf("memory_free failed!\n");
-		memory_cleanup(num_alloc, list);
-		return 0;
-	}
-
-	/* Repeat a cycle of allocation and free a given number of times */
-	for (i = 0; i < r; ++i) {
-		/* memory allocation according to 'num_free' */
-		for (j = 0; j < MAX_SIZE_EXPONENT; ++j) {
-			num_alloc_tmp[j] = 0;
-		}
-		if (memory_allocation(list, num_free, num_alloc_tmp) == false) {
-			printf("memory_allocation failed!\n");
-			memory_cleanup(num_alloc, list);
-			return 0;
-		}
-		for (j = 0; j < MAX_SIZE_EXPONENT; ++j) {
-			num_alloc[j] += num_alloc_tmp[j];
-		}
-		
-		/* free allocation according to 'num_free' */
-		if (memory_free(num_alloc_tmp, num_alloc, list) == false) {
-			printf("memory_free failed!\n");
-			memory_cleanup(num_alloc, list);
-			return 0;
-		}
-	}
-
-	printf("\nMemory allocation & free repeated at %d times.\n", r);
-
-	/* wait for 10 seconds before free-ing all the memory */
-	printf("\nAll memory test has been done.\n");
-	printf("\nMemory allocation status: \n");
-	printf("Size [bytes]	# of alloc/free(repeat)	# of remaining alloc\n");
-	for (i = 0; i < MAX_SIZE_EXPONENT; ++i) {
-		if (num_alloc[i] > 0) {
-			printf("%d		%d			%d\n", 1 << (i + 4), num_free[i], num_alloc[i]);
-		}
-	}
-	printf("\nPlease, use 'heapinfo' to see how the heap memory is fragmented in detail.\n");
-
+	printf("init: table_bytes=%d capacity=%d seed=%u\n",
+		MEMFRAG_TRACK_BYTES, g_capacity, (unsigned int)g_prng_state);
 	return 0;
 }
+
+/* Compact approach: no need for find_free_slot or find_nth_active
+ * - malloc: append at g_active_count (O(1))
+ * - free: swap with last entry (O(1))
+ */
+
+static void memfrag_log_status(const char *tag)
+{
+	printf("%s: active=%d bytes=%zu capacity=%d\n",
+		tag, g_active_count, g_active_bytes, g_capacity);
+}
+
+static void memfrag_dump_heapinfo(void)
+{
+#ifdef CONFIG_DEBUG_MM_HEAPINFO
+	int fd;
+	heapinfo_option_t option;
+
+	fd = open(MMINFO_DRVPATH, O_RDONLY);
+	if (fd < 0) {
+		printf("heapinfo: open %s failed\n", MMINFO_DRVPATH);
+		return;
+	}
+
+	memset(&option, 0, sizeof(option));
+	option.heap_type = HEAPINFO_HEAP_TYPE_BINARY;
+	strncpy(option.app_name, CONFIG_APP1_BIN_NAME, BIN_NAME_MAX - 1);
+	option.app_name[BIN_NAME_MAX - 1] = '\0';
+
+	if (ioctl(fd, MMINFOIOC_PARSE, (unsigned long)&option) < 0) {
+		printf("heapinfo: ioctl parse failed\n");
+	}
+
+#ifndef CONFIG_DEBUG_CHECK_FRAGMENTATION
+	printf("heapinfo: fragmentation detail requires CONFIG_DEBUG_CHECK_FRAGMENTATION\n");
+#endif
+
+	close(fd);
+#else
+	printf("heapinfo: not available (CONFIG_DEBUG_MM_HEAPINFO disabled)\n");
+#endif
+}
+
+static bool memfrag_parse_size(const char *text, size_t *value)
+{
+	char *endptr;
+	unsigned long parsed;
+
+	if (!text || !value) {
+		return false;
+	}
+
+	parsed = strtoul(text, &endptr, 10);
+	if (endptr == text || *endptr != '\0') {
+		return false;
+	}
+
+	*value = (size_t)parsed;
+	return true;
+}
+
+static bool memfrag_parse_ratio(const char *text, int *numer, int *denom)
+{
+	char *slash;
+	char *endptr;
+	long n, d;
+
+	if (!text || !numer || !denom) {
+		return false;
+	}
+
+	slash = strchr(text, '/');
+	if (!slash) {
+		return false;
+	}
+
+	n = strtol(text, &endptr, 10);
+	if (endptr != slash || n <= 0) {
+		return false;
+	}
+
+	d = strtol(slash + 1, &endptr, 10);
+	if (*endptr != '\0' || d <= 0 || n > d) {
+		return false;
+	}
+
+	*numer = (int)n;
+	*denom = (int)d;
+	return true;
+}
+
+static void memfrag_print_usage(const char *prog)
+{
+	printf("Usage:\n");
+	printf("  %s init [seed]\n", prog);
+	printf("  %s seed <seed>\n", prog);
+	printf("  %s malloc <total_bytes>\n", prog);
+	printf("  %s free <count>\n", prog);
+	printf("  %s loop <bytes> <ratio> <count>\n", prog);
+	printf("  %s info\n", prog);
+	printf("  %s help\n", prog);
+}
+
+/****************************************************************************
+ * Public Functions
+ ****************************************************************************/
 
 #ifdef CONFIG_BUILD_KERNEL
 int main(int argc, FAR char *argv[])
@@ -331,10 +293,247 @@ int main(int argc, FAR char *argv[])
 int memfrag_main(int argc, char *argv[])
 #endif
 {
-	printf("Memory fragmentation test!!\n");
-	task_create("memory fragmentation test", 100, 2048, memory_fragmentation_test, argv);
+	const char *cmd;
+	size_t value = 0;
+	size_t remaining;
+	size_t allocated_bytes = 0;
+	int alloc_count = 0;
+	int free_count = 0;
+	int slot;
+	size_t chunk;
+	const char *fail_reason = NULL;
 
-	sleep(1);
+	if (argc < 2) {
+		memfrag_print_usage(argv[0]);
+		return -1;
+	}
 
-	return 0;
+	cmd = argv[1];
+	if (strcmp(cmd, "help") == 0) {
+		memfrag_print_usage(argv[0]);
+		return 0;
+	}
+
+	if (strcmp(cmd, "init") == 0) {
+		int ret;
+
+		if (argc >= 3) {
+			if (!memfrag_parse_size(argv[2], &value)) {
+				printf("init: invalid seed\n");
+				return -1;
+			}
+			ret = memfrag_init_table((uint32_t)value, true);
+		} else {
+			ret = memfrag_init_table(0, false);
+		}
+		if (ret < 0) {
+			return ret;
+		}
+		memfrag_log_status("init");
+		return 0;
+	}
+
+	if (strcmp(cmd, "seed") == 0) {
+		if (argc < 3 || !memfrag_parse_size(argv[2], &value)) {
+			printf("seed: invalid seed\n");
+			return -1;
+		}
+		memfrag_set_seed((uint32_t)value);
+		printf("seed: %u\n", (unsigned int)g_prng_state);
+		memfrag_log_status("seed");
+		return 0;
+	}
+
+	if (strcmp(cmd, "info") == 0) {
+		memfrag_log_status("info");
+		memfrag_dump_heapinfo();
+		return 0;
+	}
+
+	if (!g_entries) {
+		printf("error: run 'memfrag init' first\n");
+		return -1;
+	}
+
+	if (strcmp(cmd, "malloc") == 0) {
+		if (argc < 3 || !memfrag_parse_size(argv[2], &value) || value == 0) {
+			printf("malloc: invalid size\n");
+			return -1;
+		}
+
+		remaining = value;
+		while (remaining > 0) {
+			/* Compact: just use g_active_count as slot (O(1)) */
+			if (g_active_count >= g_capacity) {
+				fail_reason = "table full";
+				break;
+			}
+
+			chunk = memfrag_select_size();
+			if (chunk > remaining) {
+				chunk = remaining;
+			}
+
+			slot = g_active_count;
+			g_entries[slot].ptr = malloc(chunk);
+			if (!g_entries[slot].ptr) {
+				fail_reason = "malloc failed";
+				break;
+			}
+
+			g_entries[slot].size = chunk;
+			g_active_count++;
+			g_active_bytes += chunk;
+
+			alloc_count++;
+			allocated_bytes += chunk;
+			remaining -= chunk;
+		}
+
+		printf("malloc: requested=%zu bytes, allocated=%zu bytes in %d blocks\n",
+			value, allocated_bytes, alloc_count);
+		if (fail_reason) {
+			printf("malloc: stopped (%s)\n", fail_reason);
+		}
+		memfrag_log_status("malloc");
+		return 0;
+	}
+
+	if (strcmp(cmd, "free") == 0) {
+		if (argc < 3 || !memfrag_parse_size(argv[2], &value) || value == 0) {
+			printf("free: invalid count\n");
+			return -1;
+		}
+
+		while (free_count < (int)value && g_active_count > 0) {
+			/* Compact: random index in [0, g_active_count-1], then swap with last (O(1)) */
+			int target = (int)(pseudo_random() % (uint32_t)g_active_count);
+			int last = g_active_count - 1;
+
+			free(g_entries[target].ptr);
+			g_active_bytes -= g_entries[target].size;
+
+			/* Swap with last entry to keep array compact */
+			if (target != last) {
+				g_entries[target].ptr = g_entries[last].ptr;
+				g_entries[target].size = g_entries[last].size;
+			}
+			g_entries[last].ptr = NULL;
+			g_entries[last].size = 0;
+
+			g_active_count--;
+			free_count++;
+		}
+
+		printf("free: requested=%zu blocks, freed=%d blocks\n",
+			value, free_count);
+		if (g_active_count == 0 && free_count < (int)value) {
+			printf("free: stopped (no active allocations)\n");
+		}
+		memfrag_log_status("free");
+		return 0;
+	}
+
+	if (strcmp(cmd, "loop") == 0) {
+		size_t loop_bytes;
+		int numer, denom;
+		size_t loop_count;
+		size_t iter;
+		int free_target;
+		int i;
+
+		if (argc < 5) {
+			printf("loop: usage: loop <bytes> <ratio> <count>\n");
+			return -1;
+		}
+
+		if (!memfrag_parse_size(argv[2], &loop_bytes) || loop_bytes == 0) {
+			printf("loop: invalid bytes\n");
+			return -1;
+		}
+
+		if (!memfrag_parse_ratio(argv[3], &numer, &denom)) {
+			printf("loop: invalid ratio (use format like 1/2)\n");
+			return -1;
+		}
+
+		if (!memfrag_parse_size(argv[4], &loop_count) || loop_count == 0) {
+			printf("loop: invalid count\n");
+			return -1;
+		}
+
+		printf("loop: bytes=%zu ratio=%d/%d count=%zu\n",
+			loop_bytes, numer, denom, loop_count);
+
+		for (iter = 1; iter <= loop_count; iter++) {
+			/* malloc phase */
+			remaining = loop_bytes;
+			alloc_count = 0;
+			allocated_bytes = 0;
+			fail_reason = NULL;
+
+			while (remaining > 0) {
+				if (g_active_count >= g_capacity) {
+					fail_reason = "table full";
+					break;
+				}
+
+				chunk = memfrag_select_size();
+				if (chunk > remaining) {
+					chunk = remaining;
+				}
+
+				slot = g_active_count;
+				g_entries[slot].ptr = malloc(chunk);
+				if (!g_entries[slot].ptr) {
+					fail_reason = "malloc failed";
+					break;
+				}
+
+				g_entries[slot].size = chunk;
+				g_active_count++;
+				g_active_bytes += chunk;
+
+				alloc_count++;
+				allocated_bytes += chunk;
+				remaining -= chunk;
+			}
+
+			/* free phase: free (active_count * numer / denom) blocks */
+			free_target = (g_active_count * numer) / denom;
+			free_count = 0;
+
+			for (i = 0; i < free_target && g_active_count > 0; i++) {
+				int target = (int)(pseudo_random() % (uint32_t)g_active_count);
+				int last = g_active_count - 1;
+
+				free(g_entries[target].ptr);
+				g_active_bytes -= g_entries[target].size;
+
+				if (target != last) {
+					g_entries[target].ptr = g_entries[last].ptr;
+					g_entries[target].size = g_entries[last].size;
+				}
+				g_entries[last].ptr = NULL;
+				g_entries[last].size = 0;
+
+				g_active_count--;
+				free_count++;
+			}
+
+			printf("loop[%zu]: malloc %zu bytes (%d blocks), free %d/%d (%d blocks)\n",
+				iter, allocated_bytes, alloc_count, numer, denom, free_count);
+			if (fail_reason) {
+				printf("loop[%zu]: malloc stopped (%s)\n", iter, fail_reason);
+			}
+			memfrag_log_status("loop");
+		}
+
+		memfrag_dump_heapinfo();
+		return 0;
+	}
+
+	printf("unknown command: %s\n", cmd);
+	memfrag_print_usage(argv[0]);
+	return -1;
 }
