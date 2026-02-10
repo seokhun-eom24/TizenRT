@@ -93,6 +93,14 @@ function pre_download()
 	if test -f "${SMARTFS_BIN_PATH}"; then
 		cp -p ${SMARTFS_BIN_PATH} ${IMG_TOOL_PATH}/${CONFIG_ARCH_BOARD}_smartfs.bin
 	fi
+	if test -f "${ROMFS_BIN_PATH}"; then
+		cp -p ${ROMFS_BIN_PATH} ${IMG_TOOL_PATH}/romfs.bin
+		if [ -f "${IMG_TOOL_PATH}/romfs.bin" ]; then
+			echo "ROMFS copied successfully (romfs.img -> romfs.bin)"
+		else
+			echo "ROMFS copy failed"
+		fi
+	fi
 	if test -f "${BIN_PATH}/${BOOTPARAM}.bin"; then
 		cp -p ${BIN_PATH}/${BOOTPARAM}.bin ${IMG_TOOL_PATH}/${BOOTPARAM}.bin
 	fi
@@ -125,6 +133,10 @@ function pre_download()
 		if [ "$HAS_RESOURCE" -eq "1" ]; then
 			LAST_IMAGE=${RESOURCE_BIN_NAME}
 		fi
+
+		if test -f "${ROMFS_BIN_PATH}"; then
+			LAST_IMAGE="romfs.bin"
+		fi
 	fi
 	if [ "$USB_DOWNLOAD" -eq "1" ]; then
 		touch "${IMG_TOOL_PATH}/USB_download_setting.txt"
@@ -138,6 +150,7 @@ function board_download()
 	if [ ! -f ${IMG_TOOL_PATH}/$3 ];then
 		echo "$3 not present"
 	else
+		echo "board_download: $3 to $2 (LAST_IMAGE=$LAST_IMAGE, arg6=$6)"
 		if [ "$USB_DOWNLOAD" -eq "0" ]; then
 			#echo "UART download"
 			./upload_image_tool_linux "download" $1 1 $2 $3
@@ -237,6 +250,9 @@ function post_download()
 	if test -f "${RESOURCE_BIN_NAME}"; then
 		[ -e ${RESOURCE_BIN_NAME} ] && rm ${RESOURCE_BIN_NAME}
 	fi
+	if test -f "${ROMFS_BIN_PATH}"; then
+		[ -e romfs.bin ] && rm romfs.bin
+	fi
 	if test -f "${EXTERNAL}.bin"; then
 		[ -e ${EXTERNAL}.bin ] && rm ${EXTERNAL}.bin
 	fi
@@ -245,5 +261,3 @@ function post_download()
 		rm "${IMG_TOOL_PATH}/USB_erase_setting.txt"
 	fi
 }
-
-

@@ -30,6 +30,7 @@ PARTITION_KCONFIG=${OS_PATH}/board/common/Kconfig
 CONFIG=${OS_PATH}/.config
 source ${CONFIG}
 SMARTFS_BIN_PATH=${BIN_PATH}/${CONFIG_ARCH_BOARD}_smartfs.bin
+ROMFS_BIN_PATH=${BIN_PATH}/romfs.img
 
 BOARD_CONFIG=${TOP_PATH}/build/configs/${CONFIG_ARCH_BOARD}/board_metadata.txt
 BOARD_SPECIFIC_SCRIPT=${TOP_PATH}/build/configs/${CONFIG_ARCH_BOARD}/${CONFIG_ARCH_BOARD}_download.sh
@@ -164,7 +165,7 @@ function get_executable_name()
 		resource) echo "${RESOURCE_BIN_NAME}";;
 		userfs) echo "${CONFIG_ARCH_BOARD}_smartfs.bin";;
 		sssfw|wlanfw) echo "$1.bin";;
-		rom) echo "romfs.img";;
+		rom|romfs) echo "romfs.bin";;
 		bootparam)
 			if [[ ! -n "${BOOTPARAM}" ]];then
 				echo "No Binary Match"
@@ -331,6 +332,7 @@ download_all()
 	found_app2=false
 	found_common=false
 	found_resource=false
+	found_romfs=false
 	
 	for partidx in ${!parts[@]}; do
 
@@ -380,6 +382,12 @@ download_all()
 				continue
 			fi
 			found_resource=true
+		fi
+		if [[ "${parts[$partidx]}" == "romfs" ]];then
+			if [[ $found_romfs == true ]];then
+				continue
+			fi
+			found_romfs=true
 		fi
 		exe_name=$(get_executable_name ${parts[$partidx]})
 		if [[ "No Binary Match" = "${exe_name}" ]];then
