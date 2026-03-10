@@ -54,6 +54,12 @@
 #define GET_BIT_VAL(val, bit)            ((val >> bit) & 1)
 #define SET_BIT_VAL(val, bit, new_val)   ((val & (~ (1 << bit)))|(new_val << bit))
 
+#ifdef CONFIG_DEBUG
+#define showprogress(c) up_lowputc(c)
+#else
+#define showprogress(c)
+#endif
+
 /*----------------------------------------------------------------------------
   External References
  *----------------------------------------------------------------------------*/
@@ -436,6 +442,8 @@ void os_heap_init(void)
 
 __FLASH_BOOT_CODE void _start(void)
 {
+	showprogress('A');
+
 #if defined(CONFIG_PSRAM)
 #if defined(CONFIG_XIP_KERNEL) && (CONFIG_XIP_KERNEL == 1)
     bk_psram_init();
@@ -444,11 +452,13 @@ __FLASH_BOOT_CODE void _start(void)
     bk_psram_code_init();
 #endif
 #endif
+	showprogress('B');
 
 #if defined(CONFIG_MPU)
     mpu_init();
     bk_mpu_init();
 #endif // CONFIG_MPU
+	showprogress('C');
 
 #if defined(CONFIG_DCACHE)
     if (SCB->CLIDR & SCB_CLIDR_DC_Msk)
@@ -475,6 +485,7 @@ __FLASH_BOOT_CODE void _start(void)
     pm_hardware_init();
 
     bk_gpio_driver_init();
+	showprogress('D');
 	//Important notice!!!!!
 	//ATE uses UART TX PIN as the detect ATE mode pin,
 	//so it should be called after GPIO init and before UART init.
@@ -483,6 +494,7 @@ __FLASH_BOOT_CODE void _start(void)
 	bk_ate_init();
 #endif
     bk_uart_driver_init();
+	showprogress('E');
     bk_flash_driver_init();
 
 #if defined(CONFIG_ARMV8M_MPU) && defined(CONFIG_BUILD_PROTECTED)
@@ -509,6 +521,9 @@ __FLASH_BOOT_CODE void _start(void)
 #endif
     /* Call os_start() */
     extern void os_start(void);
+	showprogress('F');
+	showprogress('\r');
+	showprogress('\n');
     os_start();
 
     /* Shoulnd't get here */
