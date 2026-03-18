@@ -436,10 +436,35 @@ int sched_getcpucount(void);
 /* Task Switching Interfaces (non-standard) */
 /**
  * @ingroup SCHED_KERNEL
- * @brief disable context switching
- * @details @b #include <sched.h> \n
- * SYSTEM CALL API
- * @return On success, OK is returned. On failure, ERROR is returned.
+ * @brief Disable context switching (preemption lock)
+ *
+ * @details
+ * This function disables context switching by preventing new tasks from
+ * being added to the ready-to-run list. The calling task will be the only
+ * task allowed to run until:
+ * - sched_unlock() is called the same number of times as sched_lock()
+ * - The task blocks itself
+ *
+ * Calls can be nested; each call increments an internal lock counter.
+ *
+ * @par Example
+ * @code
+ * #include <sched.h>
+ *
+ * sched_lock();
+ * // Critical section - preemption disabled
+ * do_critical_work();
+ * sched_unlock();
+ * @endcode
+ *
+ * @return OK (0) on success
+ *
+ * @note Has no effect when called from interrupt context.
+ * @note On SMP systems, this only prevents scheduling on the calling CPU.
+ *
+ * @see sched_unlock()
+ * @see sched_lockcount()
+ *
  * @since TizenRT v1.0
  */
 int sched_lock(void);

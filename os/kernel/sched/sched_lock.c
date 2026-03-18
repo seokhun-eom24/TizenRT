@@ -50,6 +50,14 @@
  *
  ************************************************************************/
 
+/**
+ * @file sched_lock.c
+ * @brief Scheduler lock implementation for preemption control
+ *
+ * This file implements sched_lock() which disables context switching
+ * by preventing task preemption. Supports both SMP and non-SMP configurations.
+ */
+
 /************************************************************************
  * Included Files
  ************************************************************************/
@@ -162,23 +170,20 @@ volatile cpu_set_t g_cpu_lockset;
  * Public Functions
  ************************************************************************/
 
-/************************************************************************
- * Name:  sched_lock
+/**
+ * @brief Disable context switching
  *
- * Description:
- *   This function disables context switching by disabling addition of
- *   new tasks to the g_readytorun task list.  The task that calls this
- *   function will be the only task that is allowed to run until it
- *   either calls  sched_unlock() (the appropriate number of times) or
- *   until it blocks itself.
+ * This function disables context switching by disabling addition of
+ * new tasks to the g_readytorun task list. The task that calls this
+ * function will be the only task allowed to run until it either calls
+ * sched_unlock() (the appropriate number of times) or blocks itself.
  *
- * Inputs
- *   None
+ * On SMP systems, this function also:
+ * - Acquires the CPU scheduler lock (g_cpu_lockset)
+ * - Moves ready-to-run tasks to pending queue
  *
- * Return Value:
- *   OK on success; ERROR on failure
- *
- ************************************************************************/
+ * @return OK on success
+ */
 
 #ifdef CONFIG_SMP
 int sched_lock(void)
