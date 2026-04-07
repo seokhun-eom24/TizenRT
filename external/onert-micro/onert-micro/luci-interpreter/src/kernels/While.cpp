@@ -37,18 +37,18 @@ void configure_kernel_CircleWhile(const circle::Operator *cur_op, BaseRuntimeGra
   auto *body_runtime_graph = runtime_module->getRuntimeGraphAt(body_subgraph_index);
 
   body_runtime_graph->selectOwnSubgraph();
-  const auto body_input_size = body_runtime_graph->getNumOfInputTensors();
-  const auto body_output_size = body_runtime_graph->getNumOfOutputTensors();
-  LUCI_INTERPRETER_CHECK(body_input_size == cur_op->inputs()->size());
-  LUCI_INTERPRETER_CHECK(body_output_size == cur_op->outputs()->size());
-  LUCI_INTERPRETER_CHECK(body_output_size == cur_op->inputs()->size());
+  const int body_input_size = body_runtime_graph->getNumOfInputTensors();
+  const int body_output_size = body_runtime_graph->getNumOfOutputTensors();
+  LUCI_INTERPRETER_CHECK(body_input_size == static_cast<int>(cur_op->inputs()->size()));
+  LUCI_INTERPRETER_CHECK(body_output_size == static_cast<int>(cur_op->outputs()->size()));
+  LUCI_INTERPRETER_CHECK(body_output_size == static_cast<int>(cur_op->inputs()->size()));
   body_runtime_graph->invalidate();
   body_runtime_graph->configure(false);
 
   cond_runtime_graph->selectOwnSubgraph();
-  const auto cond_input_size = cond_runtime_graph->getNumOfInputTensors();
-  const auto cond_output_size = cond_runtime_graph->getNumOfOutputTensors();
-  LUCI_INTERPRETER_CHECK(cond_input_size == cur_op->inputs()->size());
+  const int cond_input_size = cond_runtime_graph->getNumOfInputTensors();
+  const int cond_output_size = cond_runtime_graph->getNumOfOutputTensors();
+  LUCI_INTERPRETER_CHECK(cond_input_size == static_cast<int>(cur_op->inputs()->size()));
   LUCI_INTERPRETER_CHECK(cond_output_size == 1);
   const circle::Tensor *cond_output_tensor = cond_runtime_graph->getOutputTensorByIndex(0);
   LUCI_INTERPRETER_CHECK(Tensor::element_type(cond_output_tensor) == DataType::BOOL);
@@ -72,7 +72,7 @@ void execute_kernel_CircleWhile(const circle::Operator *cur_op, BaseRuntimeGraph
 
   bool is_inplace = runtime_graph->is_inplace_op(cur_op);
 
-  for (int32_t i = 0; i < input_size; ++i)
+  for (flatbuffers::uoffset_t i = 0; i < input_size; ++i)
   {
     const auto op_input_index = cur_op->inputs()->operator[](i);
     const auto op_output_index = cur_op->outputs()->operator[](i);
@@ -127,8 +127,8 @@ void execute_kernel_CircleWhile(const circle::Operator *cur_op, BaseRuntimeGraph
   {
     cond_runtime_graph->selectOwnSubgraph();
 
-    for (int32_t i = 0; i < input_size; ++i)
-      cond_runtime_graph->configureGraphInput(i, operation_inputs_data[i]);
+    for (flatbuffers::uoffset_t i = 0; i < input_size; ++i)
+      cond_runtime_graph->configureGraphInput(static_cast<int32_t>(i), operation_inputs_data[i]);
 
     cond_runtime_graph->execute();
 
@@ -137,14 +137,14 @@ void execute_kernel_CircleWhile(const circle::Operator *cur_op, BaseRuntimeGraph
       break;
 
     body_runtime_graph->selectOwnSubgraph();
-    for (int32_t i = 0; i < input_size; ++i)
-      body_runtime_graph->configureGraphInput(i, operation_inputs_data[i]);
+    for (flatbuffers::uoffset_t i = 0; i < input_size; ++i)
+      body_runtime_graph->configureGraphInput(static_cast<int32_t>(i), operation_inputs_data[i]);
 
     body_runtime_graph->execute();
 
-    for (int32_t i = 0; i < input_size; ++i)
+    for (flatbuffers::uoffset_t i = 0; i < input_size; ++i)
     {
-      auto cur_output_body_data = body_runtime_graph->getOutputDataByIndex(i);
+      auto cur_output_body_data = body_runtime_graph->getOutputDataByIndex(static_cast<int32_t>(i));
       if (cur_output_body_data == nullptr)
         continue;
       std::memcpy(operation_inputs_data[i], cur_output_body_data, input_sizes[i]);
@@ -162,7 +162,7 @@ void execute_kernel_CircleWhile(const circle::Operator *cur_op, BaseRuntimeGraph
 
   if (is_inplace)
   {
-    for (int32_t i = 0; i < input_size; ++i)
+    for (flatbuffers::uoffset_t i = 0; i < input_size; ++i)
     {
       const auto op_input_index = cur_op->inputs()->operator[](i);
       const auto op_output_index = cur_op->outputs()->operator[](i);
