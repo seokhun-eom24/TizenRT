@@ -216,6 +216,8 @@ int log_dump_read_wake(void)
 /* This function is called during read and compress the last partially filled block */
 int log_dump_compress_lastblock(void)
 {
+	unsigned long compressed_size;
+
 	read_node = (struct log_dump_chunk_s *)sq_peek(&log_dump_chunks);	/* reset the read node to head */
 
 	if (read_node == NULL) {
@@ -230,8 +232,11 @@ int log_dump_compress_lastblock(void)
 	}
 
 	last_comp_block_size = CONFIG_LOG_DUMP_CHUNK_SIZE;
+	compressed_size = last_comp_block_size;
 
-	compress_ret = compress_block(&last_comp_block[4],&last_comp_block_size,  (unsigned char *)uncomp_buf[uncomp_idx], uncomp_curbytes);
+	compress_ret = compress_block(&last_comp_block[4], &compressed_size,
+				      (unsigned char *)uncomp_buf[uncomp_idx], uncomp_curbytes);
+	last_comp_block_size = compressed_size;
 
 	if (compress_ret != LOG_DUMP_OK) {
 		last_comp_block_size = 0;
