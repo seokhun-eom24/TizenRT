@@ -27,8 +27,8 @@ namespace luci_interpreter
 RuntimeGraph::RuntimeGraph(SimpleMemoryManager *memory_manager, CircleReader *circle_reader,
                            RuntimeModule *runtime_module, uint32_t subgraph_index)
   : _memory_manager(memory_manager),
+    _reader(circle_reader), _runtime_module(runtime_module),
     _tensor_to_data(std::unordered_map<const circle::Tensor *, uint8_t *>{}),
-    _runtime_module(runtime_module), _reader(circle_reader),
     _inplace_op_indexes(std::unordered_set<const circle::Operator *>{}),
     _subgraph_index(subgraph_index)
 {
@@ -64,12 +64,12 @@ void RuntimeGraph::buildAllocDeallocPlan(bool dealloc_input)
     }
   }
 
-  for (int32_t index = 0; index < num_kernels; ++index)
+  for (size_t index = 0; index < num_kernels; ++index)
   {
     const auto kernel = _reader->operators().at(index);
     assert(kernel != nullptr);
 
-    for (int32_t j = 0; j < kernel->inputs()->size(); ++j)
+    for (flatbuffers::uoffset_t j = 0; j < kernel->inputs()->size(); ++j)
     {
       const auto input_index = kernel->inputs()->operator[](j);
 
@@ -87,20 +87,21 @@ void RuntimeGraph::buildAllocDeallocPlan(bool dealloc_input)
         if (_inplace_op_indexes.find(kernel) != _inplace_op_indexes.end())
           lifetimes.at(raw_tensor).second = -1;
         else
-          lifetimes.at(raw_tensor).second = index;
+          lifetimes.at(raw_tensor).second = static_cast<int32_t>(index);
       }
     }
 
-    for (int32_t j = 0; j < kernel->outputs()->size(); ++j)
+    for (flatbuffers::uoffset_t j = 0; j < kernel->outputs()->size(); ++j)
     {
       const auto output_index = kernel->outputs()->operator[](j);
       const auto raw_tensor = _reader->tensors()[output_index];
 
       assert(lifetimes.count(raw_tensor) == 0);
       if (_inplace_op_indexes.find(kernel) != _inplace_op_indexes.end())
-        lifetimes[raw_tensor] = Lifetime(-1, index);
+        lifetimes[raw_tensor] = Lifetime(-1, static_cast<int32_t>(index));
       else
-        lifetimes[raw_tensor] = Lifetime(index, index);
+        lifetimes[raw_tensor] =
+          Lifetime(static_cast<int32_t>(index), static_cast<int32_t>(index));
     }
   }
 
@@ -109,7 +110,7 @@ void RuntimeGraph::buildAllocDeallocPlan(bool dealloc_input)
     const auto raw_tensor = _reader->tensors()[output_ind];
 
     if (lifetimes.count(raw_tensor) > 0)
-      lifetimes.at(raw_tensor).second = num_kernels;
+      lifetimes.at(raw_tensor).second = static_cast<int32_t>(num_kernels);
   }
 
   _alloc_plan.assign(num_kernels, std::vector<const circle::Tensor *>());
@@ -201,7 +202,7 @@ void RuntimeGraph::resetOutputTensorsData()
 {
   assert(_reader->get_current_subgraph_index() == _subgraph_index);
   const auto graph_inputs = _reader->inputs();
-  for (int i = 0; i < _reader->outputs().size(); ++i)
+  for (flatbuffers::uoffset_t i = 0; i < _reader->outputs().size(); ++i)
   {
     const auto tensor_index = _reader->outputs()[i];
     assert(tensor_index != -1);
