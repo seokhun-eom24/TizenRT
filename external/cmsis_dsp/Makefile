@@ -88,9 +88,11 @@ $(COBJS): %$(OBJEXT): %.c
 	$(call COMPILE, $<, $@)
 
 .built: $(OBJS)
-	$(eval CMSIS_OBJS = $(wildcard *.o))
+	@if ! ls *.o >/dev/null 2>&1; then \
+		$(CROSSDEV)ar -x .$(DELIM)$(CMSIS_DSP_DIR_NAME_UNQUOTATED)$(DELIM)$(CMSIS_DSP_LIB)$(LIBEXT); \
+	fi
 	$(call ARCHIVE, $(BIN), $(OBJS))
-	$(Q) $(CROSSDEV)ar -rcs $(BIN) $(CMSIS_OBJS)
+	$(Q) $(CROSSDEV)ar -rcs $(BIN) *.o
 	@find . -name "*.o" -delete
 	$(Q) touch .built
 
@@ -103,10 +105,10 @@ depend: .depend
 
 clean:
 	$(call DELFILE, .built)
+	@find . -name "*.o" -delete
 
 distclean: clean
 	$(call DELFILE, Make.dep)
 	$(call DELFILE, .depend)
 
 -include Make.dep
-
