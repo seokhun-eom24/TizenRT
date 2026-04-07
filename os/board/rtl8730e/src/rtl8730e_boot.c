@@ -63,6 +63,7 @@
 
 #include <tinyara/fs/mksmartfs.h>
 #include <tinyara/board.h>
+#include <tinyara/i2c.h>
 #ifdef CONFIG_FLASH_PARTITION
 #include <tinyara/fs/mtd.h>
 #endif
@@ -117,6 +118,7 @@ static int up_check_prod(void)
 	}
 	return ERROR;
 }
+
 int up_check_prodswd(void)
 {
 	return up_check_prod();
@@ -154,6 +156,8 @@ int up_check_iwdg(void)
 	} else {
 		dbg("IWDG is enabled\n");
 	}
+
+	return OK;
 }
 
 void board_i2s_initialize(void)
@@ -206,7 +210,7 @@ void board_i2c_initialize(void)
 #ifdef CONFIG_AMEBASMART_I2C0
 	bus = 0;
 	snprintf(path, sizeof(path), "/dev/i2c-%d", bus);
-	i2c = (struct i2c_dev_s *)up_i2cinitialize(bus);
+	i2c = up_i2cinitialize(bus);
 #ifdef CONFIG_I2C_USERIO
 	if (i2c != NULL) {
 		ret = i2c_uioregister(path, i2c);
@@ -517,4 +521,3 @@ int board_app_initialize(void)
 {
 	return OK;
 }
-

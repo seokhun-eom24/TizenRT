@@ -23,8 +23,12 @@
 
 #define BLE_DRV_TAG "[BLEDRV_SERVER]"
 
-static void ble_server_connected_null_cb(trble_conn_handle con_handle, trble_server_connection_type_e conn_type, uint8_t mac[TRBLE_BD_ADDR_MAX_LEN])
+static void ble_server_connected_null_cb(trble_conn_handle con_handle, trble_server_connection_type_e conn_type, uint8_t mac[TRBLE_BD_ADDR_MAX_LEN], uint8_t adv_handle)
 {
+	(void)con_handle;
+	(void)conn_type;
+	(void)mac;
+	(void)adv_handle;
 	return;
 }
 

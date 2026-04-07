@@ -81,6 +81,8 @@
  * can be enabled with CONFIG_FS_AIO
  */
 
+struct aiocb;
+
 #ifdef CONFIG_FS_AIO
 
 #ifndef CONFIG_SCHED_WORKQUEUE

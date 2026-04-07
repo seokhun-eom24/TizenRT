@@ -40,7 +40,7 @@ static void show_usage(void)
 	printf("status		show current value of security level\n\n");
 }
 
-static void tash_security_level(int argc, char **args)
+static int tash_security_level(int argc, char **args)
 {
 	security_handle hnd;
 	security_data ss_data = {NULL, 0};
@@ -49,13 +49,13 @@ static void tash_security_level(int argc, char **args)
 
 	if (argc < 2) {
 		show_usage();
-		return;
+		return -1;
 	}
 
 	/* Show usage */
 	if (!strncmp(args[1], "--help", 7)) {
 		show_usage();
-		return;
+		return 0;
 	}
 
 	/* Init security handler */
@@ -64,7 +64,7 @@ static void tash_security_level(int argc, char **args)
 		printf("[tash_security_level] Failed to initialize security handler\n");
 		printf("[security_init] error ret : %d\n", ret);
 		free(hnd);
-		return;
+		return -1;
 	}
 
 	/* Form the secure storage path name based on the slot index */
@@ -77,7 +77,7 @@ static void tash_security_level(int argc, char **args)
 			printf("[tash_security_level] Failed to read secure storage\n");
 			printf("[ss_read_secure_storage] error ret : %d\n", ret);
 			(void)security_deinit(hnd);
-			return;
+			return -1;
 		}
 
 		if (!strncmp(ss_data.data, "1", 2)) {
@@ -90,7 +90,7 @@ static void tash_security_level(int argc, char **args)
 		}
 		
 		(void)security_deinit(hnd);
-		return;
+		return 0;
 	}
 
 	/* Change security_level according to user input */
@@ -102,7 +102,7 @@ static void tash_security_level(int argc, char **args)
 	} else {
 		printf("Invalid argument (%s).\n", args[1]);
 		show_usage();
-		return;
+		return -1;
 	}
 	
         /* Write 'security_level' variable to secure storage  */
@@ -111,7 +111,7 @@ static void tash_security_level(int argc, char **args)
 		printf("[tash_security_level] Failed to write data in secure storage\n");
 		printf("[ss_write_secure_storage] error ret : %d\n", ret);
 		(void)security_deinit(hnd);
-		return;
+		return -1;
 	} 
 	
 	(void)security_deinit(hnd);
@@ -122,8 +122,9 @@ static void tash_security_level(int argc, char **args)
 	ret = prctl(PR_SET_SECURITY_LEVEL);
 	if (ret != 0) {
 		printf("[prctl] Fail to call set_security_level. ret : %d\n", ret);
-		return;
+		return -1;
 	}
+	return 0;
 }
 
 /****************************************************************************

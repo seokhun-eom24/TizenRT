@@ -32,10 +32,14 @@
 namespace aifw {
 
 AIModel::AIModel(void) :
+	mBuffer(nullptr),
+	mAIEngine(nullptr),
 #ifdef CONFIG_AIFW_MULTI_INOUT_SUPPORT
-	mInvokeResult(NULL), mInputSizeList(NULL), mOutputSizeList(NULL), mInputSetCount(0), mOutputSetCount(0),
+	mInvokeInput(NULL), mInvokeOutput(NULL), mInvokeResult(NULL), mInputSizeList(NULL), mOutputSizeList(NULL), mInputSetCount(0), mOutputSetCount(0),
+#else
+	mInvokeInput(NULL), mInvokeOutput(NULL),
 #endif
-	mInvokeInput(NULL), mInvokeOutput(NULL), mParsedData(NULL), mPostProcessedData(NULL), mDataProcessor(nullptr), mBuffer(nullptr)
+	mParsedData(NULL), mPostProcessedData(NULL), mDataProcessor(nullptr)
 {
 	memset(&mModelAttribute, '\0', sizeof(AIModelAttribute));
 #ifdef CONFIG_AIFW_USE_ONERT_MICRO
@@ -51,10 +55,14 @@ AIModel::AIModel(void) :
 }
 
 AIModel::AIModel(std::shared_ptr<AIProcessHandler> dataProcessor) :
+	mBuffer(nullptr),
+	mAIEngine(nullptr),
 #ifdef CONFIG_AIFW_MULTI_INOUT_SUPPORT
-	mInvokeResult(NULL), mInputSizeList(NULL), mOutputSizeList(NULL), mInputSetCount(0), mOutputSetCount(0),
+	mInvokeInput(NULL), mInvokeOutput(NULL), mInvokeResult(NULL), mInputSizeList(NULL), mOutputSizeList(NULL), mInputSetCount(0), mOutputSetCount(0),
+#else
+	mInvokeInput(NULL), mInvokeOutput(NULL),
 #endif
-	mInvokeInput(NULL), mInvokeOutput(NULL), mParsedData(NULL), mPostProcessedData(NULL), mDataProcessor(dataProcessor), mBuffer(nullptr)
+	mParsedData(NULL), mPostProcessedData(NULL), mDataProcessor(dataProcessor)
 {
 	memset(&mModelAttribute, '\0', sizeof(AIModelAttribute));
 #ifdef CONFIG_AIFW_USE_ONERT_MICRO
@@ -721,4 +729,3 @@ uint32_t AIModel::getModelCode()
 }
 
 } /* namespace aifw */
-

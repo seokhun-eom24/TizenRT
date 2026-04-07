@@ -78,7 +78,7 @@ struct ndp120_lower_s {
 	struct spi_io_config spi_config;
 
 	/* callback function: attach the mi48 interrupt handler to the GPIO interrupt */
-	CODE int (*attach)(ndp120_handler_t handler, FAR char *arg);
+	CODE int (*attach)(ndp120_handler_t handler, void *arg);
 
 	/* eanble/disable ndp120 interrupts hadling on Host Device */
 	CODE void (*irq_enable)(bool enable);
