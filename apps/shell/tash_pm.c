@@ -26,7 +26,7 @@
 
 #define TASH_PM_DOMAIN_NAME "TASH"
 
-static int tash_pm_domain_id = -1;
+static struct pm_domain_s *tash_pm_domain_id = NULL;
 static int pmdrv_fd = -1;
 
 void tash_pm_open_driver(void)
@@ -47,10 +47,10 @@ void tash_pm_close_driver(void)
 	}
 }
 
-int tash_pm_get_domain_id(void)
+struct pm_domain_s *tash_pm_get_domain_id(void)
 {
 	pm_domain_arg_t pm_domain_arg;
-	if (tash_pm_domain_id == -1) {
+	if (tash_pm_domain_id == NULL) {
 		pm_domain_arg.domain_name = TASH_PM_DOMAIN_NAME;
 		if (pmdrv_fd < 0) {
 			shdbg("First open pm driver using tash_pm_open_driver() to register %s domain\n", TASH_PM_DOMAIN_NAME);
