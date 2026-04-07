@@ -39,7 +39,7 @@ struct task_struct inic_ipc_api_host_handler;
 extern void *g_km4_log_queue;
 
 #define RETRY_COUNT 2500
-static volatile u8 inic_ipc_old_ip_addr[4] = {0};
+static u8 inic_ipc_old_ip_addr[4] = {0};
 // static buffer to hold log message
 static u8 g_inic_ipc_logging_buf[CONFIG_KM4_MAX_LOG_QUEUE_SIZE][CONFIG_KM4_MAX_LOG_BUFFER_SIZE] = { 0 };
 static u8 g_inic_ipc_logging_buf_ctr = 0;

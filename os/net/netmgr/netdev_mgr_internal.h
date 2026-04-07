@@ -30,6 +30,8 @@
 	} while (0)
 #define GET_NETIF_FROM_NETDEV(dev) (struct netif *)(((struct netdev_ops *)(dev)->ops)->nic)
 
+struct ifaddrs;
+
 struct nic_config {
 	int flag;
 	int mtu;
