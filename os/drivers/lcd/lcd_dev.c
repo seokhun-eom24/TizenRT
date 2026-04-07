@@ -387,11 +387,10 @@ static int lcddev_ioctl(FAR struct file *filep, int cmd, unsigned long arg)
 #if defined(CONFIG_LCD_FLUSH_THREAD)
 static void lcd_flushing_thread(int argc, char **argv)
 {
-	int ret;
 	DEBUGASSERT(argc == 2);
-	FAR struct lcddev_area_s *lcd_area;
+	const struct lcddev_area_s *lcd_area;
 	struct lcd_s *lcd_info = (struct lcd_s *)strtoul(argv[1], NULL, 16);
-	lcd_area = &(lcd_info->lcd_area);
+	lcd_area = lcd_info->lcd_area;
 	while (true) {
 		while (sem_wait(&lcd_info->flush_buffer_sem) != 0) {
 			ASSERT(errno == EINTR);
@@ -493,7 +492,7 @@ int lcddev_register(struct lcd_dev_s *dev)
 	}
 
 	if (lcd_info->dev->getplaneinfo) {
-		lcd_info->dev->getplaneinfo(lcd_info->dev, 0, &lcd_info->planeinfo);	//plane no is taken 0 here
+		lcd_info->dev->getplaneinfo(lcd_info->dev, 0, lcd_info->planeinfo);	//plane no is taken 0 here
 		snprintf(devname, 16, "/dev/lcd0");
 		ret = register_driver(devname, &g_lcddev_fops, 0666, lcd_info);
 		if (ret == OK) {

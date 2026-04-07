@@ -154,7 +154,7 @@ static const lcm_setting_table_t lcd_init_cmd_g_hlt_a196[] = {
 // Vendor mapping table
 typedef struct {
 	uint32_t id;
-	lcm_setting_table_t *init_cmd;
+	const lcm_setting_table_t *init_cmd;
 } lcd_vendor_map_t;
 
 static const lcd_vendor_map_t g_lcd_vendors[] = {
