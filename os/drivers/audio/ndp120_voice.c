@@ -822,9 +822,9 @@ static int ndp120_release(FAR struct audio_lowerhalf_s *dev)
 	return 0;
 }
 
-static void ndp120_interrupt_dispatch(int d)
+static void ndp120_interrupt_dispatch(void *arg)
 {
-	struct ndp120_dev_s *priv = (struct ndp120_dev_s *)d;
+	struct ndp120_dev_s *priv = (struct ndp120_dev_s *)arg;
 #ifdef CONFIG_PM
 	pm_timedsuspend(priv->pm_domain, 10000);
 #endif

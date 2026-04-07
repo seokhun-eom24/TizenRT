@@ -53,7 +53,13 @@
 #define SYNTIANT_NDP_ILIB_SYNTIANT_CORE_2_PATCH_VERSION 0
 
 
+#ifndef STR_HELPER
 #define STR_HELPER(x)   #x
+#endif
+
+#ifdef STR
+#undef STR
+#endif
 #define STR(x)          STR_HELPER(x)
 
 #ifndef EXCLUDE_SYNTIANT_CORE_1
@@ -88,4 +94,3 @@
 
 #define SYNTIANT_NDP_MCU_HASH  "None"
 #define SYNTIANT_NDP_DSP_HASH  "None"
-

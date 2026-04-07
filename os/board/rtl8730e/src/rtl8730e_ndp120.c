@@ -61,6 +61,7 @@
 struct rtl8730e_ndp120_audioinfo_s {
 	struct ndp120_lower_s lower;
 	ndp120_handler_t handler;
+	void *handler_arg;
 	gpio_t dmic;
 	gpio_t reset;
 	gpio_irq_t data_ready;
@@ -80,6 +81,7 @@ static struct rtl8730e_ndp120_audioinfo_s g_ndp120info = {
 	},
 
 	.handler = NULL,
+	.handler_arg = NULL,
 };
 
 /****************************************************************************
@@ -88,6 +90,9 @@ static struct rtl8730e_ndp120_audioinfo_s g_ndp120info = {
 
 static void rtl8730e_ndp120_irq_handler(uint32_t id, gpio_irq_event event)
 {
+	(void)id;
+	(void)event;
+
 	/* we are using level based interrupt trigger here,
 	 * so, we have to disable this particular gpio interrupt
 	 * until we finish this particular interrupt related work
@@ -96,7 +101,7 @@ static void rtl8730e_ndp120_irq_handler(uint32_t id, gpio_irq_event event)
 	gpio_irq_disable(&g_ndp120info.data_ready);
 
 	if (g_ndp120info.handler != NULL) {
-		g_ndp120info.handler(id);
+		g_ndp120info.handler(g_ndp120info.handler_arg);
 	} else {
 		gpio_irq_enable(&g_ndp120info.data_ready);
 	}
@@ -111,12 +116,22 @@ static void rtl8730e_ndp120_enable_irq(bool enable)
 	}
 }
 
-static void rtl8730e_ndp120_irq_attach(ndp120_handler_t handler, FAR char *arg)
+static int rtl8730e_ndp120_irq_attach(ndp120_handler_t handler, void *arg)
 {
+	int ret;
+
 	g_ndp120info.handler = handler;
-	gpio_irq_init(&g_ndp120info.data_ready, PA_23, rtl8730e_ndp120_irq_handler, arg);
+	g_ndp120info.handler_arg = arg;
+
+	ret = gpio_irq_init(&g_ndp120info.data_ready, PA_23, rtl8730e_ndp120_irq_handler, 0);
+	if (ret != 0) {
+		return ERROR;
+	}
+
 	gpio_irq_set(&g_ndp120info.data_ready, IRQ_HIGH, 1);
 	gpio_irq_enable(&g_ndp120info.data_ready);
+
+	return OK;
 }
 
 static void rtl8730e_ndp120_set_dmic(bool enable)
@@ -132,7 +147,7 @@ static void rtl8730e_ndp120_set_dmic(bool enable)
 	}
 }
 
-static void rtl8730e_ndp120_reset()
+static void rtl8730e_ndp120_reset(void)
 {
 	gpio_dir(&g_ndp120info.reset, PIN_OUTPUT);
 	gpio_mode(&g_ndp120info.reset, PullDown);
@@ -155,6 +170,7 @@ static void rtl8730e_ndp120_pm(bool sleep)
 	}
 }
 #endif
+
 
 /****************************************************************************
  * Public Functions
@@ -232,4 +248,3 @@ int rtl8730e_ndp120_initialize(int minor)
 	return ret;
 }
 #endif
-

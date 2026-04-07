@@ -1677,8 +1677,9 @@ static void ndp120_signal_mb(struct ndp120_dev_s *dev)
 	}
 }
 
-int ndp120_irq_handler_work(struct ndp120_dev_s *dev)
+static void ndp120_irq_handler_work(void *arg)
 {
+	struct ndp120_dev_s *dev = (struct ndp120_dev_s *)arg;
 
 	/* Note that currently this is only used to detect keyword match,
 	 * but later will be expanded to AI related notifications */
@@ -1809,15 +1810,18 @@ int ndp120_irq_handler_work(struct ndp120_dev_s *dev)
 	}
 
 errout_with_irq:
+	if (ret != SYNTIANT_NDP_ERROR_NONE) {
+		auddbg("irq handler work failed: %d\n", ret);
+	}
 	/* re-enable interrupts as we have finished the interrupt related work */
 	dev->lower->irq_enable(true);
-	return ret;
+	return;
 }
 
 int ndp120_irq_handler(struct ndp120_dev_s *dev)
 {
 	/* add work to the work queue, dont enable interrupts until we handled this one compeltely */
-	return work_queue(HPWORK, &ndp120_work, ndp120_irq_handler_work, (void *)dev, 0);
+	return work_queue(HPWORK, &ndp120_work, ndp120_irq_handler_work, dev, 0);
 }
 
 int ndp120_set_sample_ready_int(struct ndp120_dev_s *dev, int on)
