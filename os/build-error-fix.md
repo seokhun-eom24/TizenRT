@@ -28,6 +28,7 @@
 - [x] `apps/shell/tash_pm.c`: stored the TASH PM domain as `struct pm_domain_s *` and used `NULL` as the sentinel, matching the PM driver API and removing pointer/integer mismatch warnings.
 - [x] `apps/system/init/Makefile`: split dependency generation between `$(CC) $(CFLAGS)` for C sources and `$(CXX) $(CXXFLAGS)` for `terminate_handler.cxx`, which removes the `cc1plus` warnings about C-only options.
 - [x] `apps/system/utils/security_level_cmd.c`: changed the TASH callback to return `int` and added explicit status returns so the command registration matches the expected callback type.
+- [x] `apps/examples/wifi_manager/wm_test/wm_test_connectbyrssi_test.c`: changed `_wt_disconnect()` to `_wt_disconnect(void)` so the file no longer emits the strict-prototypes warning for an old-style empty parameter list.
 - [x] `external/cmsis_dsp/Makefile`: preserved and re-archived object files correctly during rebuilds and removed stale `.o` files during clean, which prevents archive/update build failures during clean rebuild flows.
 - [x] `external/cmsis_nn/Makefile`: same archive/update cleanup fix as `external/cmsis_dsp/Makefile` for clean rebuild stability.
 - [x] `external/libopus/celt/arch.h`: changed `#elif OPUS_ARM_INLINE_EDSP` to a `defined()`-guarded form to eliminate the undefined macro warning.
@@ -37,12 +38,27 @@
 - [x] `external/onert-micro/onert-micro/luci-interpreter/include/luci_interpreter/core/Tensor.h`: cast the signed index to `uint32_t` before comparing with `const_dims.size()` to remove the signed/unsigned comparison warning.
 - [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Builders.h`: guarded `USE_GENERATED_LIST` with `defined()` so missing macro definitions no longer warn.
 - [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/KernelBuilder.h`: same `defined(USE_GENERATED_LIST)` guard fix as `Builders.h`.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/pal/common/PALReduceCommon.h`: changed the reduction loop index to `int` so it matches the signed `output_flat_size` argument and removes the signed/unsigned comparison warning.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/core/RuntimeGraph.cpp`: reordered constructor initializers and changed multiple graph traversal indices to the correct unsigned FlatBuffers types, removing initializer-order and signed/unsigned warnings.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Add.cpp`: parenthesized the mixed `or`/`&&` assert condition to remove the operator-precedence warning.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Concatenation.cpp`: changed the input loop index to `flatbuffers::uoffset_t` so it matches `inputs()->size()`.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Fill.cpp`: changed the fill loop index to `size_t` so it matches the `flat_size` parameter type.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/FullyConnected.cpp`: changed the loop index to `uint32_t` so it matches `num_dims`.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Gather.cpp`: removed the unused temporary `x` variable that triggered `-Wunused-variable`.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Mul.cpp`: parenthesized the mixed `or`/`&&` assert condition to remove the operator-precedence warning.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Pack.cpp`: changed the dimension loop index to `uint32_t` so it matches `input_dims.size()`.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Unpack.cpp`: changed loop indices and size comparisons to typed casts that match the FlatBuffers/API return types, removing signed/unsigned warnings.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Utils.cpp`: removed the duplicate unused quantized activation-range helper overload that produced an unused-function warning.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/Utils.h`: changed tensor-shape loop indices to `uint32_t` so they match the size-returning helpers.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/kernels/While.cpp`: changed runtime-graph size variables and loop indices to consistent typed values/casts so the while-kernel checks and loops no longer warn.
+- [x] `external/onert-micro/onert-micro/luci-interpreter/src/loader/GraphLoader.cpp`: changed FlatBuffers input iteration and distance handling to typed unsigned values, removing signed/unsigned comparison warnings.
 - [x] `framework/src/aifw/AIManifestParser.cpp`: removed the outer `stdVals` declaration that was shadowed and unused.
 - [x] `framework/src/aifw/AIModel.cpp`: reordered and completed constructor initializer lists to match member declaration order and remove constructor initialization-order warnings.
 - [x] `framework/src/aifw/AIModelService.cpp`: logged `errno` directly instead of keeping an unused local copy.
 - [x] `framework/src/ble_manager/ble_manager_state.c`: removed the unused `conn` variable.
 - [x] `framework/src/media/voice/EPDProcessHandler.cpp`: removed the unused `srawData` variable.
 - [x] `os/arch/arm/src/amebasmart/amebasmart_enet.c`: zero-initialized `packet_filter` to remove the maybe-uninitialized warning.
+- [x] `os/arch/arm/include/amebasmart/cmsis_nn/arm_nn_math_types.h`: guarded `__ARM_FEATURE_MVE` with `defined()` so the CMSIS-NN header no longer warns when MVE support macros are absent.
 - [x] `os/arch/arm/src/amebasmart/amebasmart_i2s.c`: changed hardware config pointers to `const` and removed unnecessary casts so the code no longer discards `const`.
 - [x] `os/arch/arm/src/armv7-a/arm_fullcontextrestore.c`: added `__builtin_unreachable()` after the restore syscall because control never really returns there.
 - [x] `os/binfmt/binfmt_execmodule.c`: cast `register_exidx()` arguments to the expected unwind and text-pointer types.
@@ -77,3 +93,8 @@
 - [x] `os/pm/pm_procfs.c`: fixed comment text that contained `/*` inside comments and kept the path-template traversal pointers `const` so qualifier-discard warnings are removed.
 - [x] `os/syscall/Makefile`: added `$(MKSYSCALL)` as a `.context` dependency so syscall proxies are regenerated when the generator changes.
 - [x] `os/tools/mksyscall.c`: generated `return 0;` in the affected stub cases so auto-generated syscall proxies no longer emit wrong return-type warnings.
+
+## Verified But Not Committed
+
+- [x] `build/configs/rtl8730e/loadable_ext_ddr_st7785/Untitled`: local text artifact containing only `loadable_ext_ddr_st7785`; not source code and not related to build warning fixes.
+- [x] `os/.codex`: empty local artifact file; not source code and not related to build warning fixes.
