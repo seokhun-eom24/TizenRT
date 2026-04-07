@@ -115,7 +115,7 @@ depend: .depend
 $(MKSYSCALL):
 	$(Q) $(MAKE) -C $(TOPDIR)$(DELIM)tools -f Makefile.host mksyscall
 
-.context: syscall.csv
+.context: syscall.csv $(MKSYSCALL)
 	$(Q) (cd proxies; $(MKSYSCALL) -p $(CSVFILE);)
 	$(Q) (cd stubs; $(MKSYSCALL) -s $(CSVFILE);)
 	$(Q) touch $@
@@ -139,4 +139,3 @@ distclean: clean
 	$(call DELFILE, stubs$(DELIM)*.c)
 
 -include Make.dep
-
