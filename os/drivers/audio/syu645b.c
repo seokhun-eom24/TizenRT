@@ -136,6 +136,7 @@ static int syu645b_readreg_nbyte(FAR struct syu645b_dev_s *priv, uint8_t regaddr
 	return OK;
 }
 
+
 /************************************************************************************
  * Name: syu645b_exec_i2c_script
  *
@@ -1180,6 +1181,8 @@ static int syu645b_set_basic_equalizer(FAR struct syu645b_dev_s *priv, bool set_
 	if (!priv->mute) {
 		syu645b_setvolume(priv);
 	}
+
+	return ret;
 }
 
 static int syu645b_set_equalizer(FAR struct syu645b_dev_s *priv, uint32_t preset)
@@ -1402,4 +1405,3 @@ FAR struct audio_lowerhalf_s *syu645b_initialize(FAR struct i2c_dev_s *i2c, FAR 
 
 	return &priv->dev;
 }
-

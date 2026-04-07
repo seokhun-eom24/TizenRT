@@ -471,7 +471,7 @@ struct ap_buffer_s {
 	uint16_t flags;				/* Buffer flags */
 	uint16_t crefs;				/* Number of reference counts */
 	uint8_t samp[0];			/* Offset of the first sample */
-} packed_struct;
+};
 
 /* Structure defining the messages passed to a listening audio thread
  * for dequeuing buffers and other operations.  Also used to allocate
