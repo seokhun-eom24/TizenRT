@@ -126,7 +126,6 @@ static void _event_caller(int evt_pri, void *data) {
 		} break;
 		case BLE_EVT_CLIENT_DISCONNECT: {
 			ble_client_device_disconnected_cb callback = msg->param[0];
-			trble_conn_handle conn = *(trble_conn_handle *)(msg->param[2]);
 			uint16_t error = *(uint16_t *)(msg->param[2] + sizeof(trble_conn_handle));
 			callback(msg->param[1], error);
 		} break;
