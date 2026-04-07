@@ -40,8 +40,6 @@ extern int attr_counter;
 trble_le_coc_init_config le_coc_init_parm;
 rtk_bt_le_conn_ind_t *ble_tizenrt_scatternet_conn_ind = NULL;
 
-static void *bt_service_add_task_hdl = NULL;
-
 trble_result_e rtw_ble_combo_init(trble_client_init_config* init_client, trble_server_init_config* init_server)
 { 
     if (init_client == NULL) {
@@ -132,7 +130,7 @@ trble_result_e rtw_ble_combo_set_server_config(trble_server_init_config* init_se
 		return TRBLE_FAIL;
 	}
 
-	if (init_server != NULL || init_server->profile != NULL || init_server->profile_count != 0) {	/* There is valid profile*/
+	if (init_server != NULL && init_server->profile != NULL && init_server->profile_count != 0) {	/* There is valid profile*/
 		server_profile_count = init_server->profile_count;
 		for (int i = 0; i < init_server->profile_count; i++) {
 			if (init_server->profile[i].type == TRBLE_GATT_CHARACT) {
@@ -150,6 +148,8 @@ trble_result_e rtw_ble_combo_set_server_config(trble_server_init_config* init_se
 
 		ble_tizenrt_srv_add();	/* Add service */
 	}
+
+	return TRBLE_SUCCESS;
 }
 
 #endif /* TRBLE_COMBO_C_ */
