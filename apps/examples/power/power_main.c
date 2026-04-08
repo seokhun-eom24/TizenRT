@@ -72,7 +72,7 @@ static int pm_sleep_test(void *args)
 static void _pm_suspend(char *name)
 {
 	pm_domain_arg_t domain_arg;
-	int domain_id;
+	struct pm_domain_s *domain_id;
 	int fd = open(PM_DRVPATH, O_WRONLY);
 	if (fd < 0) {
 		printf("Fail to open pm(errno %d)", get_errno());
@@ -95,7 +95,7 @@ static void _pm_suspend(char *name)
 static void _pm_resume(char *name)
 {
 	pm_domain_arg_t domain_arg;
-	int domain_id;
+	struct pm_domain_s *domain_id;
 	int fd = open(PM_DRVPATH, O_WRONLY);
 	if (fd < 0) {
 		printf("Fail to open pm(errno %d)", get_errno());
@@ -119,7 +119,6 @@ static int pm_suspend_resume_test(void)
 {
 	printf("pm supend resume repeat test start\n");
 	pm_domain_arg_t domain_arg;
-	int domain_id;
 	int test_count = 0;
 	int fd = open(PM_DRVPATH, O_WRONLY);
 	if (fd < 0) {
@@ -133,7 +132,6 @@ static int pm_suspend_resume_test(void)
 		close(fd);
 		return -1;
 	}
-	domain_id = domain_arg.domain_id;
 
 	int count = 0;
 	while (is_running) {
