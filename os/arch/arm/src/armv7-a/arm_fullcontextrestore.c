@@ -63,4 +63,5 @@
 void arm_fullcontextrestore(uint32_t *restoreregs)
 {
 	sys_call1(SYS_restore_context, (uintptr_t)restoreregs);
+	while (1); // Best practice is to always terminate non-returning functions with while(1);.
 }
