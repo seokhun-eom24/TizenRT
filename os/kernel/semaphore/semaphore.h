@@ -110,6 +110,11 @@ void sem_recover(FAR struct tcb_s *tcb);
 void sem_unblock_task(sem_t *sem, struct tcb_s *htcb);
 #ifdef SAVE_SEM_HOLDER
 void sem_freeholder(sem_t *sem, FAR struct semholder_s *pholder);
+#if CONFIG_SEM_PREALLOCHOLDERS > 0 && CONFIG_SEM_NNESTPRIO > 0
+void sem_clear_reprio_mirror(FAR struct tcb_s *tcb);
+#else
+#define sem_clear_reprio_mirror(tcb)
+#endif
 void sem_initholders(void);
 void sem_destroyholder(FAR sem_t *sem);
 struct semholder_s *sem_findholder(sem_t *sem, FAR struct tcb_s *htcb);
@@ -134,6 +139,7 @@ void sem_canceled(FAR struct tcb_s *stcb, FAR sem_t *sem);
 #define sem_releaseholder(sem, htcb)
 #define sem_restorebaseprio(stcb, sem)
 #define sem_canceled(stcb, sem)
+#define sem_clear_reprio_mirror(tcb)
 #endif
 
 #undef EXTERN

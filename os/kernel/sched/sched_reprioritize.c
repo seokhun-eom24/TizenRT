@@ -61,6 +61,7 @@
 #include <errno.h>
 
 #include "sched/sched.h"
+#include "semaphore/semaphore.h"
 
 #ifdef CONFIG_PRIORITY_INHERITANCE
 
@@ -138,6 +139,13 @@ int sched_reprioritize(FAR struct tcb_s *tcb, int sched_priority)
 
 #if CONFIG_SEM_NNESTPRIO > 0
 		tcb->npend_reprio = 0;
+
+		/* The per-thread pend_reprios[] aggregate was just cleared, so the
+		 * per-semaphore demand mirrors are now stale.  Discard them too to
+		 * keep the two views consistent.
+		 */
+
+		sem_clear_reprio_mirror(tcb);
 #endif
 	}
 	return ret;

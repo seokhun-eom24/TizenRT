@@ -104,10 +104,28 @@ struct semholder_s {
 #endif
 	FAR struct tcb_s *htcb;		/* Holder TCB */
 	int16_t counts;				/* Number of counts owned by this holder */
+#if CONFIG_SEM_PREALLOCHOLDERS > 0 && CONFIG_SEM_NNESTPRIO > 0
+	/* Per-semaphore mirror of the priority-inheritance demands this (sem, holder)
+	 * pair contributed to the holder's per-thread pend_reprios[] aggregate.
+	 * Used on release to remove exactly this semaphore's entries and avoid
+	 * dropping boosts that belong to other semaphores' chains.
+	 *
+	 * NOTE: Only available when holders are pre-allocated in the kernel pool
+	 * (CONFIG_SEM_PREALLOCHOLDERS > 0).  In that case sem_t holds only a
+	 * pointer to the holder list, so growing semholder_s does NOT change the
+	 * sem_t ABI.
+	 */
+	uint8_t ndemand;					/* Number of valid entries in demands[] */
+	uint8_t demands[CONFIG_SEM_NNESTPRIO];	/* Demand values this sem contributed */
+#endif
 };
 
 #if CONFIG_SEM_PREALLOCHOLDERS > 0
+#if CONFIG_SEM_NNESTPRIO > 0
+#define SEMHOLDER_INITIALIZER {NULL, NULL, 0, 0, {0}}
+#else
 #define SEMHOLDER_INITIALIZER {NULL, NULL, 0}
+#endif
 #else
 #define SEMHOLDER_INITIALIZER {NULL, 0}
 #endif

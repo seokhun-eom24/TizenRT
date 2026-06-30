@@ -69,6 +69,7 @@
 #include "group/group.h"
 #include "signal/signal.h"
 #include "task/task.h"
+#include "semaphore/semaphore.h"
 
 /****************************************************************************
  * Definitions
@@ -239,6 +240,7 @@ int task_restart(pid_t pid)
 		tcb->cmn.base_priority = tcb->init_priority;
 #if CONFIG_SEM_NNESTPRIO > 0
 		tcb->cmn.npend_reprio = 0;
+		sem_clear_reprio_mirror(&tcb->cmn);
 #endif
 #endif
 
