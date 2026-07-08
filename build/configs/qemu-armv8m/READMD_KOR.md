@@ -217,12 +217,28 @@ printf 'ps\n' > /dev/pts/7
 최종 검증 결과는 다음과 같습니다.
 
 ```text
-qemu-armv8m/kernel_tc    Kernel TC End [PASS : 429, FAIL : 0]
-qemu-armv8m/hello         Kernel TC End [PASS : 427, FAIL : 0]
-qemu-armv8m/loadable_all  Kernel TC End [PASS : 421, FAIL : 0]
-qemu-armv8m/loadable_apps Kernel TC End [PASS : 421, FAIL : 0]
-qemu-armv8m/xip_all       Kernel TC End [PASS : 421, FAIL : 0]
+qemu-armv8m/kernel_tc     Kernel TC End [PASS : 449, FAIL : 0]
+qemu-armv8m/hello         Kernel TC End [PASS : 449, FAIL : 0]
+qemu-armv8m/loadable_all  Kernel TC End [PASS : 447, FAIL : 0]
+qemu-armv8m/loadable_apps Kernel TC End [PASS : 447, FAIL : 0]
+qemu-armv8m/xip_all       Kernel TC End [PASS : 447, FAIL : 0]
 ```
+
+os-api-test 계열 kernel TC(group/irq/pipe/procfs/vfs)를 추가로 활성화했습니다.
+이를 위해 5개 defconfig에 다음을 추가했습니다.
+
+```text
+CONFIG_SCHED_CHILD_STATUS=y      # TC_KERNEL_GROUP 의존성
+CONFIG_TC_KERNEL_GROUP=y
+CONFIG_TC_KERNEL_IRQ=y
+CONFIG_TC_KERNEL_PIPE=y
+CONFIG_TC_KERNEL_PROCFS=y
+CONFIG_TC_KERNEL_VFS=y
+CONFIG_FS_AUTOMOUNT_PROCFS=y     # procfs TC 실행에 필요한 /proc 자동 마운트
+```
+
+RTC/PM/NET/WATCHDOG/LOG_DUMP/REBOOT_REASON/BINARY_MANAGER/MEM_LEAK_CHECKER 계열
+TC는 해당 서브시스템이 qemu-armv8m 구성에 없어 Kconfig 의존성에 의해 자동 제외됩니다.
 
 flat 구성과 protected/loadable 구성의 PASS 개수가 다른 이유는 빌드 모델과
 활성화된 기능에 따라 일부 TC가 조건부로 제외되기 때문입니다.
