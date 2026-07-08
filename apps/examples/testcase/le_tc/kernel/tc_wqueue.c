@@ -25,8 +25,10 @@
 **************************************************************************/
 #include <tinyara/config.h>
 #include <tinyara/clock.h>
+#include <tinyara/os_api_test_drv.h>
 #include <tinyara/wqueue.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include "tc_internal.h"
@@ -43,11 +45,14 @@
 * Private Variables
 **************************************************************************/
 
+#ifndef CONFIG_BUILD_PROTECTED
 static clock_t start_time;
+#endif
 
 /**************************************************************************
 * Private Functions
 **************************************************************************/
+#ifndef CONFIG_BUILD_PROTECTED
 static void wq_test1(void *arg)
 {
 	clock_t cur_time = 0;
@@ -68,6 +73,7 @@ static void wq_test3(void *arg)
 	cur_time = clock();
 	printf("workqueue_test 3 : test 3 requested delay is (%u) ticks, executed delay is (%llu) ticks.\n", (uint32_t)arg, (uint64_t)cur_time - (uint64_t)start_time);
 }
+#endif
 /**************************************************************************
 * Public Functions
 **************************************************************************/
@@ -75,6 +81,12 @@ static void wq_test3(void *arg)
 static void tc_wqueue_work_queue_cancel(void)
 {
 	int result;
+
+#ifdef CONFIG_BUILD_PROTECTED
+	result = ioctl(tc_get_drvfd(), TESTIOC_WORK_QUEUE_TEST, 0);
+	TC_ASSERT_EQ("work_queue", result, OK);
+	TC_SUCCESS_RESULT();
+#else
 	int retry;
 	int success = 0;
 	struct work_s *test_work1;
@@ -128,6 +140,7 @@ cleanup:
 	if (success) {
 		TC_SUCCESS_RESULT();
 	}
+#endif
 }
 #endif
 /****************************************************************************

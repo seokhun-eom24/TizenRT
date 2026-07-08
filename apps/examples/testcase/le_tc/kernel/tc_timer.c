@@ -23,14 +23,37 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <tinyara/os_api_test_drv.h>
+#ifndef CONFIG_BUILD_PROTECTED
 #include "../../os/kernel/timer/timer.h"
+#endif
 #include "tc_internal.h"
 
 #define USECINT 10000000
 
 static int sig_no = SIGRTMIN;
 
-#ifndef CONFIG_BUILD_PROTECTED
+#ifdef CONFIG_BUILD_PROTECTED
+/**
+* @fn                   :tc_timer_timer_create_delete
+* @brief                :Create and delete a POSIX per-process timer
+* @scenario             :Create and delete a POSIX per-process timer
+* API's covered         :timer_create, timer_delete
+* Preconditions         :none
+* Postconditions        :none
+* @return               :void
+*/
+static void tc_timer_timer_create_delete(void)
+{
+	int fd;
+	int ret_chk;
+
+	fd = tc_get_drvfd();
+	ret_chk = ioctl(fd, TESTIOC_TIMER_CREATE_DELETE_TEST, 0);
+	TC_ASSERT_EQ("timer_create_delete", ret_chk, OK);
+
+	TC_SUCCESS_RESULT();
+}
+#else
 /**
 * @fn                   :tc_timer_timer_create_delete
 * @brief                :Create and delete a POSIX per-process timer
@@ -120,6 +143,28 @@ static void tc_timer_timer_create_delete(void)
 	TC_SUCCESS_RESULT();
 }
 #endif	/* CONFIG_BUILD_PROTECTED */
+
+/**
+* @fn                   :tc_timer_timer_deleteall
+* @brief                :Delete timers owned by a task during kernel timer cleanup
+* @scenario             :Create timers in the kernel test driver, call timer_deleteall,
+*                        and verify timer lists are restored
+* API's covered         :timer_deleteall
+* Preconditions         :none
+* Postconditions        :none
+* @return               :void
+*/
+static void tc_timer_timer_deleteall(void)
+{
+	int fd;
+	int ret_chk;
+
+	fd = tc_get_drvfd();
+	ret_chk = ioctl(fd, TESTIOC_TIMER_DELETEALL_TEST, 0);
+	TC_ASSERT_EQ("timer_deleteall", ret_chk, OK);
+
+	TC_SUCCESS_RESULT();
+}
 
 #ifndef CONFIG_DISABLE_POSIX_TIMERS
 /**
@@ -256,10 +301,11 @@ static void tc_timer_timer_set_get_time(void)
 
 /**
 * @fn                   :tc_timer_timer_initialize
-* @brief                :Boot up configuration of the POSIX timer facility.
-* @brief                :Boot up configuration of the POSIX timer facility.
-* API's covered         :timer_initialize
-* Preconditions         :Creation of timer_id(timer_create)
+* @brief                :Verify boot-initialized POSIX timer list state.
+* @scenario             :Create and delete one timer through the kernel driver
+*                        and verify timer list bookkeeping is restored.
+* API's covered         :timer_create, timer_delete
+* Preconditions         :timer_initialize has run during OS boot
 * Postconditions        :none
 * @return               :void
 */
@@ -281,9 +327,8 @@ static void tc_timer_timer_initialize(void)
 
 int timer_tc_main(void)
 {
-#ifndef CONFIG_BUILD_PROTECTED
 	tc_timer_timer_create_delete();
-#endif	
+	tc_timer_timer_deleteall();
 
 #ifndef CONFIG_DISABLE_POSIX_TIMERS
 	tc_timer_timer_getoverrun();
