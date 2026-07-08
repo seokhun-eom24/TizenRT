@@ -823,6 +823,7 @@ void *zalloc_at(int heap_index, size_t size);
 #endif
 
 #ifdef CONFIG_MEM_LEAK_CHECKER
+int run_mem_leak_checker(int checker_pid, char *bin_name);
 int run_all_mem_leak_checker(int checker_pid);
 #endif
 /**
