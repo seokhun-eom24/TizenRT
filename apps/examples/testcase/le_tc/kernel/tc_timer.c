@@ -179,6 +179,8 @@ static void tc_timer_timer_set_get_time(void)
 	struct itimerspec st_timer_spec_set;
 	struct itimerspec st_timer_spec_get;
 	timer_t timer_id;
+	uint32_t max_remaining_nsec;
+	uint32_t remaining_nsec;
 
 	/* Set and enable alarm */
 
@@ -238,10 +240,15 @@ static void tc_timer_timer_set_get_time(void)
 
 	ret_chk = timer_gettime(timer_id, &st_timer_spec_get);
 	TC_ASSERT_EQ_ERROR_CLEANUP("timer_gettime", ret_chk, OK, errno, timer_delete(timer_id));
-	TC_ASSERT_GEQ_CLEANUP("timer_gettime", st_timer_spec_get.it_interval.tv_nsec, st_timer_spec_set.it_interval.tv_nsec, timer_delete(timer_id));
-	TC_ASSERT_GEQ_CLEANUP("timer_gettime", st_timer_spec_get.it_interval.tv_sec, st_timer_spec_set.it_interval.tv_sec, timer_delete(timer_id));
-	TC_ASSERT_GEQ_CLEANUP("timer_gettime", st_timer_spec_get.it_value.tv_sec, st_timer_spec_set.it_value.tv_sec, timer_delete(timer_id));
-	TC_ASSERT_GEQ_CLEANUP("timer_gettime", st_timer_spec_get.it_value.tv_nsec, st_timer_spec_set.it_value.tv_nsec, timer_delete(timer_id));
+	TC_ASSERT_EQ_CLEANUP("timer_gettime", st_timer_spec_get.it_interval.tv_nsec, st_timer_spec_set.it_interval.tv_nsec, timer_delete(timer_id));
+	TC_ASSERT_EQ_CLEANUP("timer_gettime", st_timer_spec_get.it_interval.tv_sec, st_timer_spec_set.it_interval.tv_sec, timer_delete(timer_id));
+	TC_ASSERT_GEQ_CLEANUP("timer_gettime", st_timer_spec_get.it_value.tv_sec, 0, timer_delete(timer_id));
+	TC_ASSERT_LT_CLEANUP("timer_gettime", st_timer_spec_get.it_value.tv_nsec, NSEC_PER_SEC, timer_delete(timer_id));
+	remaining_nsec = st_timer_spec_get.it_value.tv_sec * NSEC_PER_SEC +
+		st_timer_spec_get.it_value.tv_nsec;
+	max_remaining_nsec = st_timer_spec_set.it_value.tv_sec * NSEC_PER_SEC +
+		st_timer_spec_set.it_value.tv_nsec + (CONFIG_USEC_PER_TICK * 1000);
+	TC_ASSERT_LEQ_CLEANUP("timer_gettime", remaining_nsec, max_remaining_nsec, timer_delete(timer_id));
 
 	timer_delete(timer_id);
 	TC_SUCCESS_RESULT();

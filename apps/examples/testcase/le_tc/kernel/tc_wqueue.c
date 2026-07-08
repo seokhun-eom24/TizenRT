@@ -28,12 +28,16 @@
 #include <tinyara/wqueue.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <unistd.h>
 #include "tc_internal.h"
 
 /**************************************************************************
 * Private Definitions
 **************************************************************************/
 #ifdef CONFIG_SCHED_WORKQUEUE
+
+#define WQUEUE_TEST_WAIT_RETRIES 300
+#define WQUEUE_TEST_WAIT_USEC (10 * USEC_PER_TICK)
 
 /**************************************************************************
 * Private Variables
@@ -71,6 +75,8 @@ static void wq_test3(void *arg)
 static void tc_wqueue_work_queue_cancel(void)
 {
 	int result;
+	int retry;
+	int success = 0;
 	struct work_s *test_work1;
 	struct work_s *test_work2;
 	struct work_s *test_work3;
@@ -100,12 +106,28 @@ static void tc_wqueue_work_queue_cancel(void)
 	TC_ASSERT_EQ_CLEANUP("work_queue", result, OK, goto cleanup);
 
 	sleep(1);
+	for (retry = 0; retry < WQUEUE_TEST_WAIT_RETRIES && (!work_available(test_work1) || !work_available(test_work3)); retry++) {
+		usleep(WQUEUE_TEST_WAIT_USEC);
+	}
+	TC_ASSERT_CLEANUP("work_available", work_available(test_work1) && work_available(test_work3), {
+		if (!work_available(test_work1)) {
+			(void)work_cancel(HPWORK, test_work1);
+		}
+		if (!work_available(test_work3)) {
+			(void)work_cancel(LPWORK, test_work3);
+		}
+		goto cleanup;
+	});
+
+	success = 1;
 
 cleanup:
 	free(test_work1);
 	free(test_work2);
 	free(test_work3);
-	TC_SUCCESS_RESULT();
+	if (success) {
+		TC_SUCCESS_RESULT();
+	}
 }
 #endif
 /****************************************************************************
