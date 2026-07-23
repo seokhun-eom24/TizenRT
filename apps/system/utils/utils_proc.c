@@ -96,7 +96,7 @@ int utils_proc_pid_foreach(procentry_handler_t handler, void *arg)
 int utils_readfile(FAR const char *filepath, char *buf, int buflen, utils_handler_t handler, void *arg)
 {
 	int fd;
-	int errcode;
+	// int errcode;
 	ssize_t nread;
 
 	if (filepath == NULL || buf == NULL || buflen <= 0) {
@@ -106,9 +106,9 @@ int utils_readfile(FAR const char *filepath, char *buf, int buflen, utils_handle
 
 	fd = open(filepath, O_RDONLY);
 	if (fd < 0) {
-		errcode = errno;
+		// errcode = errno;
 		printf("Failed to open %s\n", filepath);
-		errno = errcode;
+		// errno = errcode;
 		return ERROR;
 	}
 
@@ -118,10 +118,10 @@ int utils_readfile(FAR const char *filepath, char *buf, int buflen, utils_handle
 		nread = read(fd, buf, buflen - 1);
 		if (nread < 0) {
 			/* Read error */
-			errcode = errno;
-			printf("Failed to read %s, %d\n", filepath, errcode);
+			// errcode = errno;
+			// printf("Failed to read %s, %d\n", filepath, errcode);
 			close(fd);
-			errno = errcode;
+			// errno = errcode;
 			return ERROR;
 		}
 		buf[nread] = '\0';

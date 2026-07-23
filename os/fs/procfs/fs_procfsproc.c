@@ -331,13 +331,15 @@ static const char *g_statenames[] = {
 	"Invalid",
 	"Pending unlock",
 	"Ready",
+	"Assigned",
 	"Running",
 	"Inactive",
 	"Semaphore wait",
-	"To be unblocked wait"
+	"To be unblocked wait",
 	"Signal wait",
 	"MQ not empty wait",
-	"MQ no full wait"
+	"MQ not full wait",
+	"Page fill wait"
 };
 
 static const char *g_ttypenames[4] = {
@@ -805,7 +807,7 @@ static ssize_t proc_entry_stack(FAR struct proc_file_s *procfile, FAR struct tcb
 
 	/* Show the stack base address */
 
-	linesize = snprintf(procfile->line, STATUS_LINELEN, "%-12s0x%p\n", "StackBase:", tcb->adj_stack_ptr);
+	linesize = snprintf(procfile->line, STATUS_LINELEN, "%-12s%p\n", "StackBase:", tcb->adj_stack_ptr);
 	copysize = procfs_memcpy(procfile->line, linesize, buffer, remaining, &offset);
 
 	totalsize += copysize;
@@ -980,7 +982,7 @@ static ssize_t proc_entry_groupfd(FAR struct proc_file_s *procfile, FAR struct t
 	totalsize = 0;
 
 #if CONFIG_NFILE_DESCRIPTORS > 0	/* Guaranteed to be true */
-	linesize = snprintf(procfile->line, STATUS_LINELEN, "%3-s %-8s %s", "FD", "POS", "OFLAGS");
+	linesize = snprintf(procfile->line, STATUS_LINELEN, "%3s %-8s %s", "FD", "POS", "OFLAGS");
 	copysize = procfs_memcpy(procfile->line, linesize, buffer, remaining, &offset);
 
 	totalsize += copysize;
@@ -1013,7 +1015,7 @@ static ssize_t proc_entry_groupfd(FAR struct proc_file_s *procfile, FAR struct t
 
 #if 0 // To Do: dup is not working until BIND_TASK is implmented
 #if CONFIG_NSOCKET_DESCRIPTORS > 0
-	linesize = snprintf(procfile->line, STATUS_LINELEN, "\n%3-s %-2s %-3s %s", "SD", "RF", "TYP", "FLAGS");
+	linesize = snprintf(procfile->line, STATUS_LINELEN, "\n%3s %-2s %-3s %s", "SD", "RF", "TYP", "FLAGS");
 	copysize = procfs_memcpy(procfile->line, linesize, buffer, remaining, &offset);
 
 	totalsize += copysize;

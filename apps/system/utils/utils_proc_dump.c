@@ -129,6 +129,52 @@ static char *proc_dump_child_relative(const char *parent, const char *name)
 	return path;
 }
 
+static void proc_dump_print_stat_header(void)
+{
+	printf("# Fields: PID PPID PRIO FLAGS STATE STACK_SIZE PEAK_STACK "
+		   "CURR_HEAP PEAK_HEAP CPU IRQCOUNT WAIT_INFO");
+#ifdef CONFIG_SCHED_CPULOAD
+#ifdef CONFIG_SCHED_MULTI_CPULOAD
+	printf(" CPULOAD_SHORT CPULOAD_MID CPULOAD_LONG");
+#else
+	printf(" CPULOAD");
+#endif
+#endif
+#ifdef CONFIG_APP_BINARY_SEPARATION
+	printf(" HEAP_NAME");
+#endif
+#if CONFIG_TASK_NAME_SIZE > 0
+	printf(" NAME");
+#endif
+	printf("\n");
+	printf("# Notes: stack/heap are bytes, CPU is current/last CPU, "
+		   "FLAGS is raw TCB flags, WAIT_INFO is object/mask or -.\n");
+	printf("# STATE values: 0=INVALID 1=PENDING 2=READY 3=ASSIGNED "
+		   "4=RUNNING 5=INACTIVE 6=WAITSEM 7=WAITFIN 8=WAITSIG "
+		   "9=MQNEMPTY 10=MQNFULL 11=WAITPAGEFILL\n");
+}
+
+static void proc_dump_print_description(const char *relative)
+{
+	if (strcmp(relative, "stat") == 0) {
+		proc_dump_print_stat_header();
+	} else if (strcmp(relative, "status") == 0) {
+		printf("# Task summary: name, type, state, priority, scheduler, and signal mask.\n");
+	} else if (strcmp(relative, "cmdline") == 0) {
+		printf("# Command line: task command line, or pthread name plus argument address.\n");
+#ifdef CONFIG_SCHED_CPULOAD
+	} else if (strcmp(relative, "loadavg") == 0) {
+		printf("# CPU load: task/thread CPU usage by configured load window.\n");
+#endif
+	} else if (strcmp(relative, "stack") == 0) {
+		printf("# Stack info: adjusted stack base, usable size, and peak used bytes when available.\n");
+	} else if (strcmp(relative, "group/status") == 0) {
+		printf("# Task group: group IDs, main task, raw group flags, and member count/IDs.\n");
+	} else if (strcmp(relative, "group/fd") == 0) {
+		printf("# File descriptors: FD=descriptor, POS=file offset, OFLAGS=open flags.\n");
+	}
+}
+
 static int proc_dump_file(unsigned int pid, const char *path,
 				  const char *relative, int *error_code)
 {
@@ -136,7 +182,8 @@ static int proc_dump_file(unsigned int pid, const char *path,
 	int ret;
 
 	printf("--- %s/%u/%s ---\n", PROCFS_MOUNT_POINT, pid, relative);
-	errno = 0;
+	proc_dump_print_description(relative);
+	// errno = 0;
 	ret = utils_readfile(path, buf, PROC_DUMP_BUFLEN, NULL, NULL);
 	if (ret < 0) {
 		*error_code = errno != 0 ? errno : EIO;
@@ -169,7 +216,7 @@ static int proc_dump_walk(unsigned int pid, const char *directory,
 	ret = OK;
 	saved_errno = 0;
 	for (;;) {
-		errno = 0;
+		// errno = 0;
 		entryp = readdir(dirp);
 		if (entryp == NULL) {
 			if (errno != 0) {
@@ -251,7 +298,7 @@ static int proc_dump_pid(unsigned int pid, int *error_code)
 
 	ret = proc_dump_walk(pid, directory, "", error_code);
 	if (ret == OK) {
-		errno = 0;
+		// errno = 0;
 		if (stat(directory, &statbuf) < 0) {
 			*error_code = errno != 0 ? errno : EIO;
 			ret = ERROR;
@@ -287,7 +334,7 @@ static int proc_dump_all(void)
 		found_new_pid = false;
 		dirp = opendir(PROCFS_MOUNT_POINT);
 		if (dirp == NULL) {
-			error_code = errno != 0 ? errno : EIO;
+			// error_code = errno != 0 ? errno : EIO;
 			printf("Failed to open procfs, errno : %d\n", error_code);
 			result = ERROR;
 			converged_passes++;
@@ -296,7 +343,7 @@ static int proc_dump_all(void)
 
 		readdir_errno = 0;
 		for (;;) {
-			errno = 0;
+			// errno = 0;
 			entryp = readdir(dirp);
 			if (entryp == NULL) {
 				readdir_errno = errno;
