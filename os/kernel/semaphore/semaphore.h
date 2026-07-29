@@ -99,6 +99,9 @@ void sem_initialize(void);
 
 void sem_waitirq(FAR struct tcb_s *wtcb, int errcode);
 
+void sem_show_seminfo(FAR sem_t *sem);
+void sem_show_alivesem_list(void);
+
 /* Recover semaphore resources with a task or thread is destroyed  */
 
 void sem_recover(FAR struct tcb_s *tcb);

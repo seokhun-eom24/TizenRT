@@ -94,6 +94,7 @@
 #include "up_arch.h"
 #include "sched/sched.h"
 #include "task/task.h"
+#include "semaphore/semaphore.h"
 #include "up_internal.h"
 #ifdef CONFIG_ARMV7M_MPU
 #include "mpu.h"
@@ -859,6 +860,8 @@ static void up_dumpstate(void)
 	/* Dump the state of all tasks (if available) */
 
 	task_show_alivetask_list();
+
+	sem_show_alivesem_list();
 
 #ifdef CONFIG_FRAME_POINTER
 	/* Display the call stack of all tasks */

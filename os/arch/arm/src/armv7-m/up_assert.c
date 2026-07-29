@@ -111,6 +111,7 @@
 
 #include "irq/irq.h"
 #include "task/task.h"
+#include "semaphore/semaphore.h"
 
 #include "up_arch.h"
 #include "up_internal.h"
@@ -383,6 +384,8 @@ static void up_dumpstate(void)
 	/* Dump the state of all tasks (if available) */
 
 	task_show_alivetask_list();
+
+	sem_show_alivesem_list();
 
 	/* Dump MPU regions info */
 

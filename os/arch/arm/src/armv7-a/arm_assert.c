@@ -94,7 +94,6 @@
 #include <unistd.h>
 #include <queue.h>
 #include <tinyara/wdog.h>
-#include "semaphore/semaphore.h"
 #include "binary_manager/binary_manager_internal.h"
 #endif
 #if defined(CONFIG_DEBUG_WORKQUEUE)
@@ -104,6 +103,7 @@
 #endif
 #include "irq/irq.h"
 #include "task/task.h"
+#include "semaphore/semaphore.h"
 #include "up_internal.h"
 
 bool abort_mode = false;
@@ -565,6 +565,8 @@ static inline void print_assert_detail(const uint8_t *filename, int lineno, stru
 
 	/* Dump the state of all tasks (if available) */
 	task_show_alivetask_list();
+
+	sem_show_alivesem_list();
 
 #ifdef CONFIG_APP_BINARY_SEPARATION
 	elf_show_all_bin_section_addr();
