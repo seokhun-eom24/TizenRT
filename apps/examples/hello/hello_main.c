@@ -55,7 +55,77 @@
  ****************************************************************************/
 
 #include <tinyara/config.h>
-#include <stdio.h>
+#include <sched.h>
+#include <unistd.h>
+
+#if !defined(CONFIG_BUILD_KERNEL) && defined(CONFIG_SMP) && CONFIG_SMP_NCPUS > 1
+static int hello_task_exit(int argc, char *argv[])
+{
+	(void)argc;
+	(void)argv;
+
+	return 0;
+}
+
+static int hello_task_sleep(int argc, char *argv[])
+{
+	(void)argc;
+	(void)argv;
+
+	while (1) {
+		sleep(10);
+	}
+
+	return 0;
+}
+
+static int hello_task_loop(int cpu)
+{
+	cpu_set_t cpuset;
+	pid_t pid;
+
+	CPU_ZERO(&cpuset);
+	CPU_SET(cpu, &cpuset);
+	if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) < 0) {
+		return -1;
+	}
+
+	while (1) {
+		pid = task_create("hello_exit", SCHED_PRIORITY_DEFAULT, 1024,
+				  hello_task_exit, NULL);
+		if (pid < 0) {
+			return -1;
+		}
+
+		sched_yield();
+		task_delete(pid);
+
+		pid = task_create("hello_sleep", SCHED_PRIORITY_DEFAULT, 1024,
+				  hello_task_sleep, NULL);
+		if (pid < 0) {
+			return -1;
+		}
+
+		task_delete(pid);
+	}
+}
+
+static int hello_task_cpu0(int argc, char *argv[])
+{
+	(void)argc;
+	(void)argv;
+
+	return hello_task_loop(0);
+}
+
+static int hello_task_cpu1(int argc, char *argv[])
+{
+	(void)argc;
+	(void)argv;
+
+	return hello_task_loop(1);
+}
+#endif
 
 /****************************************************************************
  * hello_main
@@ -67,6 +137,29 @@ int main(int argc, FAR char *argv[])
 int hello_main(int argc, char *argv[])
 #endif
 {
-	printf("Hello, World!!\n");
+#if !defined(CONFIG_BUILD_KERNEL) && defined(CONFIG_SMP) && CONFIG_SMP_NCPUS > 1
+	pid_t cpu0_pid;
+	pid_t cpu1_pid;
+
+	cpu0_pid = task_create("hello_cpu0", SCHED_PRIORITY_DEFAULT, 1024,
+				   hello_task_cpu0, NULL);
+	if (cpu0_pid < 0) {
+		return -1;
+	}
+
+	cpu1_pid = task_create("hello_cpu1", SCHED_PRIORITY_DEFAULT, 1024,
+				   hello_task_cpu1, NULL);
+	if (cpu1_pid < 0) {
+		task_delete(cpu0_pid);
+		return -1;
+	}
+
+	while (1) {
+		sleep(10);
+	}
+#else
+	return -1;
+#endif
+
 	return 0;
 }

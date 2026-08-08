@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <unistd.h>
 #ifdef CONFIG_APP_BINARY_SEPARATION
 #include <queue.h>
 #include <stdint.h>
@@ -778,6 +779,7 @@ void binary_manager_update_running_state(int bin_id)
 void binary_manager_add_binlist(FAR struct tcb_s *tcb)
 {
 	int bin_idx;
+	FAR struct tcb_s *head;
 
 	if (!tcb) {
 		bmdbg("ERROR: tcb parameter is NULL\n");
@@ -800,6 +802,11 @@ void binary_manager_add_binlist(FAR struct tcb_s *tcb)
 	 * Add tcb to the binary list for fault recovery in case of threads of user binary.
 	 * Otherwise, it is unnecessary for idle or kernel threads. */
 	if (bin_idx > 0) {
+		head = tcb->sched_priority > BM_PRIORITY_MAX ? BIN_RTLIST(bin_idx) : BIN_NRTLIST(bin_idx);
+		lldbg("BINLIST ADD BEGIN cpu=%d caller=%d tcb=%p pid=%d name=%s group=%p bin=%d pri=%d head=%p\n",
+			this_cpu(), getpid(), tcb, tcb->pid, tcb->name, tcb->group, bin_idx,
+			tcb->sched_priority, head);
+
 		/* Add a tcb to a head of list */
 		if (tcb->sched_priority > BM_PRIORITY_MAX) {
 			if (BIN_RTLIST(bin_idx)) {
@@ -814,6 +821,11 @@ void binary_manager_add_binlist(FAR struct tcb_s *tcb)
 			}
 			BIN_NRTLIST(bin_idx) = tcb;
 		}
+
+		lldbg("BINLIST ADD END cpu=%d caller=%d tcb=%p pid=%d bin=%d head=%p flink=%p blink=%p\n",
+			this_cpu(), getpid(), tcb, tcb->pid, bin_idx,
+			tcb->sched_priority > BM_PRIORITY_MAX ? BIN_RTLIST(bin_idx) : BIN_NRTLIST(bin_idx),
+			tcb->bin_flink, tcb->bin_blink);
 	}
 }
 
@@ -829,12 +841,17 @@ void binary_manager_remove_binlist(FAR struct tcb_s *tcb)
 	int bin_idx;
 	struct tcb_s *prev;
 	struct tcb_s *next;
+	FAR struct tcb_s *head;
 
 	bin_idx = tcb->group->tg_binidx;
 	if (bin_idx > 0) {
+		head = tcb->sched_priority > BM_PRIORITY_MAX ? BIN_RTLIST(bin_idx) : BIN_NRTLIST(bin_idx);
 		/* Remove a tcb from the thread list of binary */
 		prev = tcb->bin_blink;
 		next = tcb->bin_flink;
+		lldbg("BINLIST REMOVE BEGIN cpu=%d caller=%d tcb=%p pid=%d name=%s group=%p bin=%d pri=%d head=%p prev=%p next=%p\n",
+			this_cpu(), getpid(), tcb, tcb->pid, tcb->name, tcb->group, bin_idx,
+			tcb->sched_priority, head, prev, next);
 		if (!prev) {
 			if (tcb->sched_priority > BM_PRIORITY_MAX) {
 				BIN_RTLIST(bin_idx) = next;
@@ -845,6 +862,9 @@ void binary_manager_remove_binlist(FAR struct tcb_s *tcb)
 			prev->bin_flink = next;
 		}
 		if (next) next->bin_blink = prev;
+		lldbg("BINLIST REMOVE END cpu=%d caller=%d tcb=%p pid=%d bin=%d head=%p\n",
+			this_cpu(), getpid(), tcb, tcb->pid, bin_idx,
+			tcb->sched_priority > BM_PRIORITY_MAX ? BIN_RTLIST(bin_idx) : BIN_NRTLIST(bin_idx));
 	}
 }
 

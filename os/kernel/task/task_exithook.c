@@ -555,9 +555,19 @@ void task_exithook(FAR struct tcb_s *tcb, int status, bool nonblocking)
 
 	irqstate_t flags;
 
+#if defined(CONFIG_BINARY_MANAGER) && defined(CONFIG_APP_BINARY_SEPARATION)
+	lldbg("BINLIST EXIT BEGIN cpu=%d caller=%d tcb=%p pid=%d flags=0x%x status=%d nonblock=%d\n",
+		this_cpu(), getpid(), tcb, tcb->pid, tcb->flags, status, nonblocking);
+#endif
+
 	flags = enter_critical_section();
 
 	if ((tcb->flags & TCB_FLAG_EXIT_PROCESSING) != 0) {
+
+#if defined(CONFIG_BINARY_MANAGER) && defined(CONFIG_APP_BINARY_SEPARATION)
+		lldbg("BINLIST EXIT SKIP cpu=%d caller=%d tcb=%p pid=%d flags=0x%x\n",
+			this_cpu(), getpid(), tcb, tcb->pid, tcb->flags);
+#endif
 
 		leave_critical_section(flags);
 		return;
@@ -648,6 +658,8 @@ void task_exithook(FAR struct tcb_s *tcb, int status, bool nonblocking)
 
 #if defined(CONFIG_BINARY_MANAGER) && defined(CONFIG_APP_BINARY_SEPARATION)
 	/* Remove a tcb from binary list */
+	lldbg("BINLIST EXIT REMOVE cpu=%d caller=%d tcb=%p pid=%d flags=0x%x\n",
+		this_cpu(), getpid(), tcb, tcb->pid, tcb->flags);
 	binary_manager_remove_binlist(tcb);
 #endif
 
