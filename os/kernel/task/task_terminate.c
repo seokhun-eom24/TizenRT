@@ -132,9 +132,9 @@
  *
  *   - pthread_exit().  Calls _exit()
  *   - exit(). Calls _exit()
- *   - _exit().  Calls task_exit() making the currently running task
- *     non-running. task_exit then calls task_terminate() (with nonblocking
- *     == true) to terminate the non-running task.
+ *   - _exit().  Calls task_exithook() while the task is still running, then
+ *     calls task_exit() to make the task non-running. task_exit then calls
+ *     task_terminate() (with nonblocking == true) only for final release.
  *
  *   NOTE: that the state of non-blocking is irrelevant when called through
  *   exit() and pthread_exit().  In those cases task_exithook() has already
@@ -143,8 +143,8 @@
  * Inputs:
  *   pid - The task ID of the task to delete.  A pid of zero
  *         signifies the calling task.
- *   nonblocking - True: The task is an unhealthy, partially torn down
- *         state and is not permitted to block.
+ *   nonblocking - True: The task has already completed task_exithook() and
+ *         is not permitted to start any blocking cleanup.
  *
  * Return Value:
  *   OK on success; or ERROR on failure
@@ -237,18 +237,18 @@ int task_terminate(pid_t pid, bool nonblocking)
 	preference_clear_callbacks(pid);
 #endif
 
-	/* Perform common task termination logic (flushing streams, calling
-	 * functions registered by at_exit/on_exit, etc.).  We need to do
-	 * this as early as possible so that higher level clean-up logic
-	 * can run in a healthy tasking environment.
-	 *
-	 * In the case where the task exits via exit(), task_exithook()
-	 * may be called twice.
-	 *
-	 * I suppose EXIT_SUCCESS is an appropriate return value???
+	/* task_exithook() must run before task_exit() removes the exiting task
+	 * from the ready-to-run list.  The nonblocking path has already completed
+	 * that cleanup from the architecture-specific _exit() entry point.
 	 */
-
-	task_exithook(dtcb, EXIT_SUCCESS, nonblocking);
+	if (nonblocking) {
+		DEBUGASSERT((dtcb->flags & TCB_FLAG_EXIT_PROCESSING) != 0);
+#ifdef HAVE_TASK_GROUP
+		DEBUGASSERT(dtcb->group == NULL);
+#endif
+	} else {
+		task_exithook(dtcb, EXIT_SUCCESS, false);
+	}
 
 	/* Deallocate its TCB */
 

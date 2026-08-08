@@ -106,6 +106,10 @@ static void _up_dumponexit(FAR struct tcb_s *tcb, FAR void *arg)
 	int i;
 #endif
 
+	if (!tcb || !tcb->group) {
+		return;
+	}
+
 	svdbg("  TCB=%p name=%s pid=%d\n", tcb, tcb->argv[0], tcb->pid);
 	svdbg("    priority=%d state=%d\n", tcb->sched_priority, tcb->task_state);
 
@@ -154,9 +158,6 @@ void _exit(int status)
 {
 	struct tcb_s *tcb;
 
-	/* Disable interrupts.  They will be restored when the next
-	 * task is started.
-	 */
 	sllvdbg("TCB=%p exiting\n", this_task());
 
 #if defined(CONFIG_DUMP_ON_EXIT) && defined(CONFIG_DEBUG)
@@ -164,6 +165,15 @@ void _exit(int status)
 	sched_foreach(_up_dumponexit, NULL);
 #endif
 
+	/* Complete cleanup while the exiting task is still a valid execution
+	 * context.  task_exit() removes it from the ready-to-run list before
+	 * task_terminate() is called, so cleanup that may block must be done here.
+	 */
+	task_exithook(this_task(), status, true);
+
+	/* Disable interrupts.  They will be restored when the next
+	 * task is started.
+	 */
 	(void)enter_critical_section();
 
 	/* Destroy the task at the head of the ready to run list. */

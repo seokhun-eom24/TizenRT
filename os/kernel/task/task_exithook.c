@@ -244,9 +244,15 @@ static inline void task_groupexit(FAR struct task_group_s *group)
 #ifdef HAVE_GROUP_MEMBERS
 static inline void task_sigchild(gid_t pgid, FAR struct tcb_s *ctcb, int status)
 {
-	FAR struct task_group_s *chgrp = ctcb->group;
+	FAR struct task_group_s *chgrp;
 	FAR struct task_group_s *pgrp;
 	siginfo_t info;
+
+	if (ctcb == NULL || ctcb->group == NULL) {
+		return;
+	}
+
+	chgrp = ctcb->group;
 
 	DEBUGASSERT(chgrp);
 
@@ -312,6 +318,10 @@ static inline void task_sigchild(gid_t pgid, FAR struct tcb_s *ctcb, int status)
 static inline void task_sigchild(FAR struct tcb_s *ptcb, FAR struct tcb_s *ctcb, int status)
 {
 	siginfo_t info;
+
+	if (ptcb == NULL || ptcb->group == NULL || ctcb == NULL || ctcb->group == NULL) {
+		return;
+	}
 
 	/* If task groups are not supported then we will report SIGCHLD when the
 	 * task exits.  Unfortunately, there could still be threads in the group
@@ -379,6 +389,10 @@ static inline void task_sigchild(FAR struct tcb_s *ptcb, FAR struct tcb_s *ctcb,
 static inline void task_signalparent(FAR struct tcb_s *ctcb, int status)
 {
 #ifdef HAVE_GROUP_MEMBERS
+	if (ctcb == NULL || ctcb->group == NULL) {
+		return;
+	}
+
 	DEBUGASSERT(ctcb && ctcb->group);
 
 	/* Keep things stationary throughout the following */
@@ -392,6 +406,10 @@ static inline void task_signalparent(FAR struct tcb_s *ctcb, int status)
 #else
 	FAR struct tcb_s *ptcb;
 
+	if (ctcb == NULL || ctcb->group == NULL) {
+		return;
+	}
+
 	/* Keep things stationary throughout the following */
 
 	sched_lock();
@@ -403,7 +421,7 @@ static inline void task_signalparent(FAR struct tcb_s *ctcb, int status)
 	 */
 
 	ptcb = sched_gettcb(ctcb->group->tg_ppid);
-	if (ptcb == NULL) {
+	if (ptcb == NULL || ptcb->group == NULL) {
 		/* The parent no longer exists... bail */
 
 		sched_unlock();
@@ -498,17 +516,27 @@ static inline void task_exitwakeup(FAR struct tcb_s *tcb, int status)
 #if CONFIG_NFILE_STREAMS > 0
 static inline void task_flushstreams(FAR struct tcb_s *tcb)
 {
-	FAR struct task_group_s *group = tcb->group;
+	FAR struct task_group_s *group;
+	FAR struct streamlist *streamlist = NULL;
+	irqstate_t flags;
+
+	flags = enter_critical_section();
+	group = tcb->group;
 
 	/* Have we already left the group?  Are we the last thread in the group? */
 
 	if (group && group->tg_nmembers == 1) {
 #if (defined(CONFIG_BUILD_PROTECTED) || defined(CONFIG_BUILD_KERNEL)) && \
-	 defined(CONFIG_MM_KERNEL_HEAP)
-		(void)lib_flushall(tcb->group->tg_streamlist);
+		 defined(CONFIG_MM_KERNEL_HEAP)
+		streamlist = group->tg_streamlist;
 #else
-		(void)lib_flushall(&tcb->group->tg_streamlist);
+		streamlist = &group->tg_streamlist;
 #endif
+	}
+	leave_critical_section(flags);
+
+	if (streamlist) {
+		(void)lib_flushall(streamlist);
 	}
 }
 #else
@@ -540,9 +568,11 @@ static inline void task_flushstreams(FAR struct tcb_s *tcb)
  *   will have already removed the tcb from the ready-to-run list to prevent
  *   any further action on this task.
  *
- *   nonblocking will be set true only when we are called from task_terminate()
- *   via _exit().  In that case, we must be careful to do nothing that can
- *   cause the cause the thread to block.
+ *   nonblocking will be set true only when we are called from the
+ *   architecture-specific _exit() entry point.  That call occurs while the
+ *   task is still running, before task_exit() removes it from the
+ *   ready-to-run list.  The flag suppresses user callbacks and stream
+ *   flushing; internal resource cleanup may still block in this context.
  *
  ****************************************************************************/
 
@@ -562,6 +592,10 @@ void task_exithook(FAR struct tcb_s *tcb, int status, bool nonblocking)
 		leave_critical_section(flags);
 		return;
 	}
+
+	/* Claim exit processing before any cleanup can re-enter this function. */
+
+	tcb->flags |= TCB_FLAG_EXIT_PROCESSING;
 
 	leave_critical_section(flags);
 
@@ -613,29 +647,13 @@ void task_exithook(FAR struct tcb_s *tcb, int status, bool nonblocking)
 
 	/* NOTE: signal handling needs to be done in a critical section. */
 
-	flags = enter_critical_section();
-
-	/* If this is the last thread in the group, then flush all streams (File
-	 * descriptors will be closed when the TCB is deallocated).
-	 *
-	 * NOTES:
-	 * 1. We cannot flush the buffered I/O if nonblocking is requested.
-	 *    that might cause this logic to block.
-	 * 2. This function will only be called with with non-blocking == true
-	 *    only when called through _exit(). _exit() behavior does not
-	 *    require that the streams be flushed
-	 */
+	/* Flush streams before entering the signal critical section. */
 
 	if (!nonblocking) {
 		task_flushstreams(tcb);
 	}
 
-	/* This function can be re-entered in certain cases.  Set a flag
-	 * bit in the TCB to note that we have already completed this exit
-	 * processing.
-	 */
-
-	tcb->flags |= TCB_FLAG_EXIT_PROCESSING;
+	flags = enter_critical_section();
 
 	/* Send the SIGCHILD signal to the parent task group */
 
@@ -650,6 +668,7 @@ void task_exithook(FAR struct tcb_s *tcb, int status, bool nonblocking)
 	/* Remove a tcb from binary list */
 	binary_manager_remove_binlist(tcb);
 #endif
+	leave_critical_section(flags);
 
 #ifdef HAVE_TASK_GROUP
 	/* Leave the task group.  Perhaps discarding any un-reaped child
@@ -660,10 +679,10 @@ void task_exithook(FAR struct tcb_s *tcb, int status, bool nonblocking)
 #endif
 
 #ifndef CONFIG_DISABLE_SIGNALS
+	flags = enter_critical_section();
 	/* Deallocate anything left in the TCB's queues */
 
 	sig_cleanup(tcb);			/* Deallocate Signal lists */
-#endif
-
 	leave_critical_section(flags);
+#endif
 }

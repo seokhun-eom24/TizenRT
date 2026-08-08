@@ -108,6 +108,9 @@ int task_terminate_unloaded(FAR struct tcb_s *tcb)
 	 */
 
 	sched_lock();
+	saved_state = enter_critical_section();
+	tcb->flags |= TCB_FLAG_EXIT_PROCESSING;
+	leave_critical_section(saved_state);
 
 #if defined(CONFIG_APP_BINARY_SEPARATION)
 	/* Disable mpu regions when the binary is unloaded if its own mpu registers are set in mpu h/w. */
@@ -131,7 +134,12 @@ int task_terminate_unloaded(FAR struct tcb_s *tcb)
 #ifdef HAVE_TASK_GROUP
 	group_leave(tcb);
 #endif
+
+#ifndef CONFIG_DISABLE_SIGNALS
+	saved_state = enter_critical_section();
 	sig_cleanup(tcb);
+	leave_critical_section(saved_state);
+#endif
 
 	saved_state = enter_critical_section();
 	dq_rem((FAR dq_entry_t *)tcb, (dq_queue_t *)g_tasklisttable[tcb->task_state].list);
@@ -144,12 +152,6 @@ int task_terminate_unloaded(FAR struct tcb_s *tcb)
 #ifdef CONFIG_PREFERENCE
 	preference_clear_callbacks(tcb->pid);
 #endif
-
-	saved_state = enter_critical_section();
-
-	tcb->flags |= TCB_FLAG_EXIT_PROCESSING;
-
-	leave_critical_section(saved_state);
 
 	/* No need to release the unloading thread's stack,
 	 * because whole heap memory will be released at one go.

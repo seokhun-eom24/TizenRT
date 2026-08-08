@@ -118,7 +118,7 @@ int group_initialize(FAR struct task_tcb_s *tcb);
 int group_bind(FAR struct pthread_tcb_s *tcb);
 int group_join(FAR struct pthread_tcb_s *tcb);
 #endif
-void group_leave(FAR struct tcb_s *tcb);
+int group_leave(FAR struct tcb_s *tcb);
 
 #if defined(HAVE_GROUP_MEMBERS) || defined(CONFIG_ARCH_ADDRENV)
 FAR struct task_group_s *group_findbygid(gid_t gid);

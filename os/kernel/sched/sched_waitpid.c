@@ -226,7 +226,7 @@ pid_t waitpid(pid_t pid, int *stat_loc, int options)
 	/* Get the TCB corresponding to this PID */
 
 	ctcb = sched_gettcb(pid);
-	if (ctcb == NULL) {
+	if (ctcb == NULL || ctcb->group == NULL) {
 		err = ECHILD;
 		goto errout_with_errno;
 	}
@@ -351,9 +351,11 @@ pid_t waitpid(pid_t pid, int *stat_loc, int options)
 
 		ctcb = sched_gettcb(pid);
 #ifdef HAVE_GROUP_MEMBERS
-		if (ctcb == NULL || ctcb->group->tg_pgid != rtcb->group->tg_gid)
+		if (ctcb == NULL || ctcb->group == NULL ||
+			ctcb->group->tg_pgid != rtcb->group->tg_gid)
 #else
-		if (ctcb == NULL || ctcb->group->tg_ppid != rtcb->pid)
+		if (ctcb == NULL || ctcb->group == NULL ||
+			ctcb->group->tg_ppid != rtcb->pid)
 #endif
 
 		{
@@ -384,9 +386,11 @@ pid_t waitpid(pid_t pid, int *stat_loc, int options)
 
 		ctcb = sched_gettcb(pid);
 #ifdef HAVE_GROUP_MEMBERS
-		if (ctcb == NULL || ctcb->group->tg_pgid != rtcb->group->tg_gid)
+		if (ctcb == NULL || ctcb->group == NULL ||
+			ctcb->group->tg_pgid != rtcb->group->tg_gid)
 #else
-		if (ctcb == NULL || ctcb->group->tg_ppid != rtcb->pid)
+		if (ctcb == NULL || ctcb->group == NULL ||
+			ctcb->group->tg_ppid != rtcb->pid)
 #endif
 
 		{

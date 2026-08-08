@@ -226,6 +226,10 @@ int pthread_completejoin(pid_t pid, FAR void *exit_value)
 	FAR struct join_s *pjoin;
 
 	svdbg("pid=%d exit_value=%p group=%p\n", pid, exit_value, group);
+	if (group == NULL) {
+		return ERROR;
+	}
+
 	DEBUGASSERT(group);
 
 	/* First, find thread's structure in the private data set. */

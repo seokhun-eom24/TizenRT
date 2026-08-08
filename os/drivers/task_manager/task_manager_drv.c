@@ -27,6 +27,7 @@
 
 #include <apps/builtin.h>
 #include <tinyara/sched.h>
+#include <tinyara/irq.h>
 #include <tinyara/signal.h>
 #include <tinyara/fs/fs.h>
 #include <tinyara/fs/ioctl.h>
@@ -98,19 +99,6 @@ static void taskmgr_pthread_group_detach(pid_t pthread_pid)
 	}
 }
 
-static struct task_group_s *taskmgr_get_group_struct(pid_t pid)
-{
-	struct tcb_s *tcb;
-
-	tcb = sched_gettcb(pid);
-	if (!tcb) {
-		tmdbg("[TM] tcb is invalid. pid = %d.\n", pid);
-		return NULL;
-	}
-
-	return tcb->group;
-}
-
 static int taskmgr_group_bind(struct task_group_s *parent_group, struct pthread_tcb_s *child_tcb)
 {
 	if (parent_group == NULL || child_tcb == NULL) {
@@ -125,22 +113,32 @@ static int taskmgr_group_bind(struct task_group_s *parent_group, struct pthread_
 static int taskmgr_pthread_group_join(pid_t parent_pid, pid_t child_pid)
 {
 	struct task_group_s *parent_group;
+	struct tcb_s *parent_tcb;
 	struct pthread_tcb_s *child_tcb;
+	irqstate_t flags;
 	int ret;
 
-	parent_group = taskmgr_get_group_struct(parent_pid);
+	flags = enter_critical_section();
+	parent_group = NULL;
+	parent_tcb = sched_gettcb(parent_pid);
+	if (parent_tcb != NULL) {
+		parent_group = parent_tcb->group;
+	}
 	child_tcb = (struct pthread_tcb_s *)sched_gettcb(child_pid);
 	if (child_tcb == NULL) {
 		tmdbg("[TM] Cannot find Child TCB.\n");
+		leave_critical_section(flags);
 		return ERROR;
 	}
 	ret = taskmgr_group_bind(parent_group, child_tcb);
 	if (ret != OK) {
 		tmdbg("[TM] Group bind is failed.\n");
+		leave_critical_section(flags);
 		return ERROR;
 	}
 
 	ret = group_join(child_tcb);
+	leave_critical_section(flags);
 	if (ret != OK) {
 		tmdbg("[TM] Group join is failed.\n");
 		return ERROR;
@@ -153,14 +151,19 @@ static int taskmgr_pthread_group_join(pid_t parent_pid, pid_t child_pid)
 static int taskmgr_pthread_ppid_change(pid_t parent_pid, pid_t child_pid)
 {
 	struct pthread_tcb_s *ptcb;
+	irqstate_t flags;
+
+	flags = enter_critical_section();
 	ptcb = (struct pthread_tcb_s *)sched_gettcb(child_pid);
 
-	if (ptcb == NULL) {
+	if (ptcb == NULL || ptcb->cmn.group == NULL) {
 		tmdbg("[TM] Invalid pthread tcb. Pthread ppid change failed.\n");
+		leave_critical_section(flags);
 		return ERROR;
 	}
 
 	ptcb->cmn.group->tg_ppid = parent_pid;
+	leave_critical_section(flags);
 	return OK;
 }
 #endif			/* CONFIG_SCHED_HAVE_PARENT && !HAVE_GROUP_MEMBERS */

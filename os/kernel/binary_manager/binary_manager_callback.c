@@ -27,6 +27,7 @@
 #include <fcntl.h>
 #include <queue.h>
 #include <sys/types.h>
+#include <tinyara/irq.h>
 
 #include <tinyara/mm/mm.h>
 #include <tinyara/sched.h>
@@ -71,6 +72,7 @@ void binary_manager_unregister_statecb(int pid)
 	statecb_node_t *cb_node;
 	binmgr_statecb_response_t response_msg;
 	char q_name[BIN_PRIVMQ_LEN];
+	irqstate_t flags;
 
 	if (pid < 0) {
 		bmdbg("Invalid pid %d\n", pid);
@@ -78,21 +80,18 @@ void binary_manager_unregister_statecb(int pid)
 		goto send_result;
 	}
 
+	flags = enter_critical_section();
 	tcb = sched_gettcb(pid);
+	bin_idx = (tcb != NULL && tcb->group != NULL) ? tcb->group->tg_binidx : -1;
+	leave_critical_section(flags);
 
-	if (tcb == NULL || tcb->group == NULL || tcb->group->tg_binidx < 0) {
+	if (bin_idx < 0) {
 		bmdbg("Fail to get tcb of pid %d\n", pid);
 		response_msg.result = BINMGR_INVALID_PARAM;
 		goto send_result;
 	}
 
 	response_msg.result = BINMGR_NOT_FOUND;
-
-	bin_idx = tcb->group->tg_binidx;
-	if (bin_idx < 0) {
-		bmdbg("binary %d is not registered\n", tcb->group->tg_binidx);
-		goto send_result;
-	}
 
 	cb_node = (statecb_node_t *)sq_peek(&BIN_CBLIST(bin_idx));
 	while (cb_node != NULL) {
@@ -125,6 +124,7 @@ void binary_manager_register_statecb(int pid, binmgr_cb_t *cb_info)
 	statecb_node_t *cb_node;
 	char q_name[BIN_PRIVMQ_LEN];
 	binmgr_statecb_response_t response_msg;
+	irqstate_t flags;
 
 	if (pid < 0 || cb_info == NULL) {
 		bmdbg("Invalid pid %d\n", pid);
@@ -132,17 +132,14 @@ void binary_manager_register_statecb(int pid, binmgr_cb_t *cb_info)
 		goto send_result;
 	}
 
+	flags = enter_critical_section();
 	tcb = sched_gettcb(pid);
-	if (tcb == NULL || tcb->group == NULL || tcb->group->tg_binidx < 0) {
+	bin_idx = (tcb != NULL && tcb->group != NULL) ? tcb->group->tg_binidx : -1;
+	leave_critical_section(flags);
+
+	if (bin_idx < 0) {
 		bmdbg("Fail to get tcb of pid %d\n", pid);
 		response_msg.result = BINMGR_INVALID_PARAM;
-		goto send_result;
-	}
-
-	bin_idx = tcb->group->tg_binidx;
-	if (bin_idx < 0) {
-		bmdbg("binary %d is not registered\n", tcb->group->tg_binidx);
-		response_msg.result = BINMGR_NOT_FOUND;
 		goto send_result;
 	}
 

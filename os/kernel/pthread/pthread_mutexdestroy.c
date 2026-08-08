@@ -112,7 +112,11 @@
 int pthread_mutex_destroy(FAR pthread_mutex_t *mutex)
 {
 	struct tcb_s *ptcb;
+	struct task_group_s *group;
 	struct join_s *pjoin = NULL;
+	bool owner_exists;
+	bool owner_is_pthread;
+	bool owner_exited;
 	int ret = EINVAL;
 	int status;
 
@@ -141,10 +145,23 @@ int pthread_mutex_destroy(FAR pthread_mutex_t *mutex)
 			 * does.
 			 */
 
+			irqstate_t flags = enter_critical_section();
 			ptcb = sched_gettcb(mutex->pid);
-			if (ptcb && ((ptcb->flags & TCB_FLAG_TTYPE_MASK) == TCB_FLAG_TTYPE_PTHREAD)) {
-				pjoin = pthread_findjoininfo(ptcb->group, ptcb->pid);
+			owner_exists = ptcb != NULL;
+			owner_is_pthread = owner_exists &&
+				((ptcb->flags & TCB_FLAG_TTYPE_MASK) == TCB_FLAG_TTYPE_PTHREAD);
+			owner_exited = false;
+			if (owner_is_pthread) {
+				group = ptcb->group;
+				if (group == NULL) {
+					owner_exited = true;
+				} else if (pthread_sem_trytake(&group->tg_joinsem) == OK) {
+					pjoin = pthread_findjoininfo(group, ptcb->pid);
+					owner_exited = pjoin == NULL || pjoin->terminated;
+					(void)pthread_sem_give(&group->tg_joinsem);
+				}
 			}
+			leave_critical_section(flags);
 
 			/* In some cases, pthread_mutex_destroy can be executed on middle of
 			 * exiting pthread which holds mutex. The sched_releasepid() updates
@@ -156,8 +173,7 @@ int pthread_mutex_destroy(FAR pthread_mutex_t *mutex)
 			 * whether pthread which holds mutex is exiting or not.
 			 */
 
-			if (ptcb == NULL || \
-			   (((ptcb->flags & TCB_FLAG_TTYPE_MASK) == TCB_FLAG_TTYPE_PTHREAD) && (pjoin == NULL || pjoin->terminated == true))) {
+			if (!owner_exists || (owner_is_pthread && owner_exited)) {
 				/* The thread associated with the PID no longer exists */
 
 				mutex->pid = -1;

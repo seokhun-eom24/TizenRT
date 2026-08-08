@@ -122,7 +122,7 @@ static void ps_print_values(char *buf, void *arg)
 		return;
 	}
 
-	printf("%5s | %4s | %4s | %7s | %c%c | %8s", stat_info[PROC_STAT_PID], stat_info[PROC_STAT_PRIORITY], \
+	printf("%5s | %4s | %4s | %4s | %7s | %c%c | %8s", stat_info[PROC_STAT_PID], stat_info[PROC_STAT_GID], stat_info[PROC_STAT_PRIORITY], \
 		flags & TCB_FLAG_ROUND_ROBIN ? "RR  " : "FIFO", utils_ttypenames[(flags & TCB_FLAG_TTYPE_MASK) >> TCB_FLAG_TTYPE_SHIFT], \
 		flags & TCB_FLAG_NONCANCELABLE ? 'N' : ' ', flags & TCB_FLAG_CANCEL_PENDING ? 'P' : ' ', \
 		utils_statenames[state]);
@@ -203,8 +203,8 @@ int utils_ps(int argc, char **args)
 	}
 
 	printf("\n");
-	printf("  PID | PRIO | FLAG |  TYPE   | NP |  STATUS  | WAIT INFO  | CPU | IRQCOUNT | NAME\n");
-	printf("------|------|------|---------|----|----------|------------|-----|----------|-----\n");
+	printf("  PID |  GID | PRIO | FLAG |  TYPE   | NP |  STATUS  | WAIT INFO  | CPU | IRQCOUNT | NAME\n");
+	printf("------|------|------|------|---------|----|----------|------------|-----|----------|-----\n");
 	/* Print information for each task/thread */
 	utils_proc_pid_foreach(ps_read_proc, NULL);
 

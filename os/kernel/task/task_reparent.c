@@ -112,7 +112,7 @@ int task_reparent(pid_t ppid, pid_t chpid)
 	/* Get the child tasks task group */
 
 	tcb = sched_gettcb(chpid);
-	if (!tcb) {
+	if (!tcb || !tcb->group) {
 		ret = -ECHILD;
 		goto errout_with_ints;
 	}
@@ -152,6 +152,11 @@ int task_reparent(pid_t ppid, pid_t chpid)
 		}
 
 		pgrp = tcb->group;
+		if (!pgrp) {
+			ret = -ESRCH;
+			goto errout_with_ints;
+		}
+
 		pgid = pgrp->tg_gid;
 	}
 
@@ -231,7 +236,7 @@ int task_reparent(pid_t ppid, pid_t chpid)
 	/* Get the child tasks TCB (chtcb) */
 
 	chtcb = sched_gettcb(chpid);
-	if (!chtcb) {
+	if (!chtcb || !chtcb->group) {
 		ret = -ECHILD;
 		goto errout_with_ints;
 	}
@@ -243,7 +248,7 @@ int task_reparent(pid_t ppid, pid_t chpid)
 	/* Get the TCB of the child task's parent (otcb) */
 
 	otcb = sched_gettcb(opid);
-	if (!otcb) {
+	if (!otcb || !otcb->group) {
 		ret = -ESRCH;
 		goto errout_with_ints;
 	}
@@ -260,7 +265,7 @@ int task_reparent(pid_t ppid, pid_t chpid)
 	/* Get the new parent task's TCB (ptcb) */
 
 	ptcb = sched_gettcb(ppid);
-	if (!ptcb) {
+	if (!ptcb || !ptcb->group) {
 		ret = -ESRCH;
 		goto errout_with_ints;
 	}

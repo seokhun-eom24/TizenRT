@@ -311,6 +311,10 @@ int sig_tcbdispatch(FAR struct tcb_s *stcb, siginfo_t *info)
 	irqstate_t saved_state;
 	int ret = OK;
 
+	if (stcb == NULL || info == NULL || stcb->group == NULL) {
+		return -ESRCH;
+	}
+
 	svdbg("TCB=0x%08x signo=%d code=%d value=%d mask=%08x\n", stcb, info->si_signo, info->si_code, info->si_value.sival_int, stcb->sigprocmask);
 
 	DEBUGASSERT(stcb && info);
@@ -438,6 +442,10 @@ int sig_dispatch(pid_t pid, FAR siginfo_t *info)
 
 	FAR struct tcb_s *stcb;
 	FAR struct task_group_s *group;
+	irqstate_t flags;
+	int ret;
+
+	flags = enter_critical_section();
 
 	/* Get the TCB associated with the pid */
 
@@ -449,7 +457,9 @@ int sig_dispatch(pid_t pid, FAR siginfo_t *info)
 		 * 2. stcb is blocked the signo signal, because of handling the previous signo signal.
 		 */
 		if (!sigismember(&stcb->sigprocmask, info->si_signo) || sigismember(&stcb->sigrecvmask, info->si_signo)) {
-			return sig_tcbdispatch(stcb, info);
+			ret = sig_tcbdispatch(stcb, info);
+			leave_critical_section(flags);
+			return ret;
 		}
 
 		/* The task/thread associated with this PID is still active.  Get its
@@ -473,23 +483,33 @@ int sig_dispatch(pid_t pid, FAR siginfo_t *info)
 		 * member.
 		 */
 
-		return group_signal(group, info);
+		ret = group_signal(group, info);
 	} else {
-		return -ESRCH;
+		ret = -ESRCH;
 	}
+
+	leave_critical_section(flags);
+	return ret;
 
 #else
 
 	FAR struct tcb_s *stcb;
+	irqstate_t flags;
+	int ret;
+
+	flags = enter_critical_section();
 
 	/* Get the TCB associated with the pid */
 
 	stcb = sched_gettcb(pid);
-	if (!stcb) {
+	if (!stcb || !stcb->group) {
+		leave_critical_section(flags);
 		return -ESRCH;
 	}
 
-	return sig_tcbdispatch(stcb, info);
+	ret = sig_tcbdispatch(stcb, info);
+	leave_critical_section(flags);
+	return ret;
 
 #endif
 }

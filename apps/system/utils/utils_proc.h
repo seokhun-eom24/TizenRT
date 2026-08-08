@@ -24,6 +24,7 @@
 
 enum proc_stat_data_e {
 	PROC_STAT_PID = 0,
+	PROC_STAT_GID,
 	PROC_STAT_PPID,
 	PROC_STAT_PRIORITY,
 	PROC_STAT_FLAG,

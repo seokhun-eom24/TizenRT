@@ -105,6 +105,10 @@ static void _xtensa_dumponexit(FAR struct tcb_s *tcb, FAR void *arg)
 	int i;
 #endif
 
+	if (!tcb || !tcb->group) {
+		return;
+	}
+
 	svdbg("  TCB=%p name=%s pid=%d\n", tcb, tcb->argv[0], tcb->pid);
 	svdbg("    priority=%d state=%d\n", tcb->sched_priority, tcb->task_state);
 
@@ -156,18 +160,24 @@ void _exit(int status)
 {
 	struct tcb_s *tcb;
 
-	/* Make sure that we are in a critical section with local interrupts.
-	 * The IRQ state will be restored when the next task is started.
-	 */
-
-	(void)up_irq_save();
-
 	sllvdbg("TCB=%p exiting\n", this_task());
 
 #ifdef CONFIG_DUMP_ON_EXIT
 	sllvdbg("Other tasks:\n");
 	sched_foreach(_xtensa_dumponexit, NULL);
 #endif
+
+	/* Complete cleanup while the exiting task is still a valid execution
+	 * context.  task_exit() removes it from the ready-to-run list before
+	 * task_terminate() is called, so cleanup that may block must be done here.
+	 */
+	task_exithook(this_task(), status, true);
+
+	/* Make sure that we are in a critical section with local interrupts.
+	 * The IRQ state will be restored when the next task is started.
+	 */
+
+	(void)up_irq_save();
 
 #if XCHAL_CP_NUM > 0
 	/* Disable co-processor support for the task that is exit-ing. */

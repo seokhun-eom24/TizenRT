@@ -65,6 +65,7 @@
 #include <tinyara/net/net.h>
 #include <tinyara/lib.h>
 #include <tinyara/sched.h>
+#include <tinyara/arch.h>
 
 #include "environ/environ.h"
 #include "signal/signal.h"
@@ -170,6 +171,12 @@ static void group_remove(FAR struct task_group_s *group)
 
 static inline void group_release(FAR struct task_group_s *group)
 {
+#if defined(HAVE_GROUP_MEMBERS) || defined(CONFIG_ARCH_ADDRENV)
+	/* Remove the group before releasing resources so no new reader can find it. */
+
+	group_remove(group);
+#endif
+
 	/* Free all un-reaped child exit status */
 
 #if defined(CONFIG_SCHED_HAVE_PARENT) && defined(CONFIG_SCHED_CHILD_STATUS)
@@ -231,12 +238,6 @@ static inline void group_release(FAR struct task_group_s *group)
 	/* Mark no address environment */
 
 	g_gid_current = 0;
-#endif
-
-#if defined(HAVE_GROUP_MEMBERS) || defined(CONFIG_ARCH_ADDRENV)
-	/* Remove the group from the list of groups */
-
-	group_remove(group);
 #endif
 
 #ifdef HAVE_GROUP_MEMBERS
@@ -351,7 +352,7 @@ static inline void group_removemember(FAR struct task_group_s *group, pid_t pid)
  *   tcb - The TCB of the task that is exiting.
  *
  * Return Value:
- *   None.
+ *   OK or a negated errno value from address-environment cleanup.
  *
  * Assumptions:
  *   Called during task deletion in a safe context.  No special precautions
@@ -360,16 +361,31 @@ static inline void group_removemember(FAR struct task_group_s *group, pid_t pid)
  *****************************************************************************/
 
 #ifdef HAVE_GROUP_MEMBERS
-void group_leave(FAR struct tcb_s *tcb)
+int group_leave(FAR struct tcb_s *tcb)
 {
 	FAR struct task_group_s *group;
+	int last = 0;
+	int ret = OK;
+	irqstate_t flags;
 
 	DEBUGASSERT(tcb);
+	flags = enter_critical_section();
 
 	/* Make sure that we have a group. */
 
 	group = tcb->group;
 	if (group) {
+		/* Release this thread's reference before detaching it from the group. */
+
+#ifdef CONFIG_ARCH_ADDRENV
+		ret = up_addrenv_detach(group, tcb);
+#endif
+
+		/* Detach the group before releasing it.  The TCB can remain visible
+		 * to task information readers until its PID is released.
+		 */
+		tcb->group = NULL;
+
 		/* Remove the member from group.  This function may be called
 		 * during certain error handling before the PID has been
 		 * added to the group.  In this case tcb->pid will be uninitialized
@@ -399,41 +415,53 @@ void group_leave(FAR struct tcb_s *tcb)
 			}
 #endif /* CONFIG_BINFMT_LOADABLE */
 
-			/* Release all of the resource held by the task group */
-
-			group_release(group);
-
-#ifdef CONFIG_BINFMT_LOADABLE
-			/* If the exiting task was loaded into RAM from a file, then we need to
-			 * release all of the memory resource.
-			 * It should be called after group_release because binfmt_exit releases whole heap memory.
-			 */
-			if (IS_BINARY_MAINTASK(tcb)) {
-				binfmt_exit(((struct task_tcb_s *)tcb)->bininfo);
-			}
-#endif
+			last = 1;
 		}
 
-		/* In any event, we can detach the group from the TCB so that we won't
-		 * do this again.
-		 */
-
-		tcb->group = NULL;
 	}
+
+	leave_critical_section(flags);
+
+	if (last) {
+		group_release(group);
+
+#ifdef CONFIG_BINFMT_LOADABLE
+		if (IS_BINARY_MAINTASK(tcb)) {
+			binfmt_exit(((struct task_tcb_s *)tcb)->bininfo);
+		}
+#endif
+	}
+
+	return ret;
 }
 
 #else							/* HAVE_GROUP_MEMBERS */
 
-void group_leave(FAR struct tcb_s *tcb)
+int group_leave(FAR struct tcb_s *tcb)
 {
 	FAR struct task_group_s *group;
+	int last = 0;
+	int ret = OK;
+	irqstate_t flags;
 
 	DEBUGASSERT(tcb);
+	flags = enter_critical_section();
 
 	/* Make sure that we have a group */
 
 	group = tcb->group;
 	if (group) {
+		/* Release this thread's reference before detaching it from the group. */
+
+#ifdef CONFIG_ARCH_ADDRENV
+		ret = up_addrenv_detach(group, tcb);
+#endif
+
+		/* Detach the group before releasing it.  The TCB can remain visible
+		 * to task information readers until its PID is released.
+		 */
+		tcb->group = NULL;
+
 		/* Yes, we have a group.. Is this the last member of the group? */
 
 		if (group->tg_nmembers > 1) {
@@ -463,28 +491,24 @@ void group_leave(FAR struct tcb_s *tcb)
 			}
 #endif /* CONFIG_BINFMT_LOADABLE */
 
-			/* Release all of the resource held by the task group */
-
-			group_release(group);
-
-#ifdef CONFIG_BINFMT_LOADABLE
-			/* If the exiting task was loaded into RAM from a file, then we need to
-			 * release all of the memory resource.
-			 * It should be called after group_release because binfmt_exit releases whole heap memory.
-			 */
-
-			if (IS_BINARY_MAINTASK(tcb)) {
-				binfmt_exit(((struct task_tcb_s *)tcb)->bininfo);
-			}
-#endif
+			last = 1;
 		}
 
-		/* In any event, we can detach the group from the TCB so we won't do
-		 * this again.
-		 */
-
-		tcb->group = NULL;
 	}
+
+	leave_critical_section(flags);
+
+	if (last) {
+		group_release(group);
+
+#ifdef CONFIG_BINFMT_LOADABLE
+		if (IS_BINARY_MAINTASK(tcb)) {
+			binfmt_exit(((struct task_tcb_s *)tcb)->bininfo);
+		}
+#endif
+	}
+
+	return ret;
 }
 
 #endif							/* HAVE_GROUP_MEMBERS */

@@ -99,7 +99,7 @@
 
 #define STATUS_LINELEN 128
 
-#define PROC_STAT_FMT_BASE "%d %d %d %d %d %d %d %d %d %d"
+#define PROC_STAT_FMT_BASE "%d %d %d %d %d %d %d %d %d %d %d"
 #ifdef CONFIG_IRQCOUNT
 #define PROC_STAT_FMT_IRQ  " %d"
 #else
@@ -107,7 +107,12 @@
 #endif
 #define PROC_STAT_FMT PROC_STAT_FMT_BASE PROC_STAT_FMT_IRQ
 
-#define PROC_STAT_DATA_BASE tcb->pid, ppid, tcb->sched_priority, tcb->flags, state, tcb->adj_stack_size, peak_stack, curr_heap, peak_heap,
+#if defined(HAVE_GROUP_MEMBERS) || defined(CONFIG_ARCH_ADDRENV)
+#define PROC_STAT_DATA_GID tcb->group ? tcb->group->tg_gid : -1,
+#else
+#define PROC_STAT_DATA_GID -1,
+#endif
+#define PROC_STAT_DATA_BASE tcb->pid, PROC_STAT_DATA_GID ppid, tcb->sched_priority, tcb->flags, state, tcb->adj_stack_size, peak_stack, curr_heap, peak_heap,
 #ifdef CONFIG_SMP
 #define PROC_STAT_DATA_CPU  tcb->cpu,
 #else
@@ -432,7 +437,7 @@ static ssize_t proc_entry_stat(FAR struct proc_file_s *procfile, FAR struct tcb_
 #endif
 
 #if defined(CONFIG_SCHED_HAVE_PARENT) && !defined(HAVE_GROUP_MEMBERS)
-	ppid = tcb->group->tg_ppid;
+	ppid = tcb->group ? tcb->group->tg_ppid : -1;
 #else
 	ppid = -1;
 #endif
@@ -880,7 +885,9 @@ static ssize_t proc_entry_groupstatus(FAR struct proc_file_s *procfile, FAR stru
 	int i;
 #endif
 
-	DEBUGASSERT(group);
+	if (group == NULL) {
+		return -ENOENT;
+	}
 
 	remaining = buflen;
 	totalsize = 0;
@@ -995,7 +1002,9 @@ static ssize_t proc_entry_groupfd(FAR struct proc_file_s *procfile, FAR struct t
 	size_t totalsize;
 	int i;
 
-	DEBUGASSERT(group);
+	if (group == NULL) {
+		return -ENOENT;
+	}
 
 	remaining = buflen;
 	totalsize = 0;

@@ -143,7 +143,7 @@ int pthread_cancel(pthread_t thread)
 
 	flags = enter_critical_section();
 	sched_lock();
-	if ((tcb->cmn.flags & TCB_FLAG_NONCANCELABLE) != 0) {
+	if ((tcb->cmn.flags & (TCB_FLAG_NONCANCELABLE | TCB_FLAG_EXIT_PROCESSING)) != 0) {
 		/* Then we cannot cancel the thread now.  Here is how this is
 		 * supposed to work:
 		 *

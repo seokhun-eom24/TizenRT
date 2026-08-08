@@ -42,6 +42,7 @@
 #endif
 
 #ifdef CONFIG_APP_BINARY_SEPARATION
+#include <tinyara/irq.h>
 #include "sched/sched.h"
 #endif
 #include "binary_manager_internal.h"
@@ -756,10 +757,14 @@ void binary_manager_update_running_state(int bin_id)
 {
 	int bin_idx;
 	struct tcb_s *tcb;
+	irqstate_t flags;
 
+	flags = enter_critical_section();
 	tcb = sched_gettcb(bin_id);
-	if (tcb && tcb->group && tcb->group->tg_binidx > 0) {
-		bin_idx = tcb->group->tg_binidx;
+	bin_idx = (tcb != NULL && tcb->group != NULL) ? tcb->group->tg_binidx : -1;
+	leave_critical_section(flags);
+
+	if (bin_idx > 0) {
 		BIN_STATE(bin_idx) = BINARY_RUNNING;
 		bmvdbg("binary '%s' state is changed, state = %d.\n", BIN_NAME(bin_idx), BIN_STATE(bin_idx));
 
@@ -829,6 +834,13 @@ void binary_manager_remove_binlist(FAR struct tcb_s *tcb)
 	int bin_idx;
 	struct tcb_s *prev;
 	struct tcb_s *next;
+	irqstate_t flags;
+
+	flags = enter_critical_section();
+	if (!tcb || !tcb->group) {
+		leave_critical_section(flags);
+		return;
+	}
 
 	bin_idx = tcb->group->tg_binidx;
 	if (bin_idx > 0) {
@@ -846,6 +858,7 @@ void binary_manager_remove_binlist(FAR struct tcb_s *tcb)
 		}
 		if (next) next->bin_blink = prev;
 	}
+	leave_critical_section(flags);
 }
 
 /****************************************************************************
