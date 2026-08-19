@@ -76,7 +76,8 @@ endif
 
 # BUILDIRS is the list of top-level directories containing Make.defs files
 
-BUILDIRS   := $(dir $(wildcard */*/Make.defs))
+BUILDIRS   := $(dir $(wildcard */Make.defs))
+BUILDIRS   += $(dir $(wildcard */*/Make.defs))
 BUILDIRS   += $(dir $(wildcard */*/*/Make.defs))
 
 define Add_Test
@@ -230,6 +231,10 @@ endif
 
 ifeq ($(CONFIG_EXAMPLES_TESTCASE_SECURITY_FRAMEWORK_UTC),y)
 	$(Q) $(call REGISTER,security_utc,utc_security_main,TASH_EXECMD_ASYNC,100,16384)
+endif
+
+ifeq ($(CONFIG_TESTING_OSTEST),y)
+	$(Q) $(call REGISTER,ostest,ostest_main,TASH_EXECMD_ASYNC,100,8192)
 endif
 
 context: $(BUILTIN_REGISTRY)$(DELIM)testcase.bdat
