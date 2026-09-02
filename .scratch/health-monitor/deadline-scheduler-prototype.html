@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Health Monitor deadline scheduler prototype</title>
+  <style>
+    :root { color-scheme: light; --ink:#17211b; --muted:#617067; --line:#d8e1db; --accent:#176b45; --soft:#eef7f1; --warn:#9d451c; }
+    * { box-sizing: border-box; }
+    body { margin:0; font:15px/1.5 system-ui,sans-serif; color:var(--ink); background:#f7f9f7; }
+    main { max-width:1120px; margin:auto; padding:32px 20px 64px; }
+    h1 { margin:0 0 8px; font-size:28px; }
+    h2 { margin:28px 0 12px; font-size:19px; }
+    p { max-width:900px; }
+    .note { color:var(--muted); }
+    .panel { background:white; border:1px solid var(--line); border-radius:12px; padding:18px; margin:14px 0; }
+    .controls { display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:12px; }
+    label { display:grid; gap:5px; color:var(--muted); font-size:13px; }
+    input, select, button { font:inherit; }
+    input, select { width:100%; padding:8px 9px; border:1px solid var(--line); border-radius:7px; background:white; }
+    button { border:1px solid var(--accent); border-radius:8px; padding:8px 12px; background:white; color:var(--accent); cursor:pointer; }
+    button.primary, button:hover { background:var(--accent); color:white; }
+    .buttons { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; }
+    .fact { padding:12px; border-radius:9px; background:var(--soft); }
+    .fact strong { display:block; font-size:18px; }
+    table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+    th, td { padding:10px 8px; border-bottom:1px solid var(--line); text-align:right; vertical-align:top; }
+    th:first-child, td:first-child { text-align:left; }
+    th { color:var(--muted); font-size:12px; }
+    .verdict { border-left:4px solid var(--accent); padding:10px 14px; background:var(--soft); }
+    .tabs { display:flex; gap:7px; flex-wrap:wrap; }
+    .tab[aria-selected="true"] { background:var(--accent); color:white; }
+    .walkthrough { margin-top:12px; }
+    .step { display:none; }
+    .step.active { display:block; }
+    code { background:#edf1ee; padding:1px 4px; border-radius:4px; }
+    .warn { color:var(--warn); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Health Monitor deadline scheduler</h1>
+  <p><strong>질문:</strong> rtl8730e의 1ms tick과 최대 256 task에서, cached minimum 도달 시 전체 정적 배열을 검사하는 방식과 “가장 가까운 deadline만 보는” heap 방식 중 어느 쪽이 실제 workload와 최악 ISR 비용에 더 적합한가?</p>
+  <p class="note">판단용 throwaway prototype입니다. 시간 측정값이 아니라 핵심 연산 횟수를 비교하며, 생산 코드로 사용하지 않습니다.</p>
+
+  <section class="panel">
+    <h2>현재 workload</h2>
+    <div class="controls">
+      <label>등록 task 수<input id="tasks" type="number" min="1" max="256" value="32"></label>
+      <label>기본 timeout (ms)<input id="timeout" type="number" min="10" value="3000"></label>
+      <label>keepalive 주기 (ms)<input id="period" type="number" min="1" value="500"></label>
+      <label>관찰 시간 (ms)<input id="duration" type="number" min="100" value="12000"></label>
+      <label>deadline 분포<select id="phase"><option value="staggered">분산</option><option value="aligned">동시</option></select></label>
+      <label>timeout 구성<select id="profile"><option value="uniform">모두 동일</option><option value="one-fast">1개 빠름, 나머지 10배</option><option value="one-tiny">1개 매우 짧음, 나머지 100배</option><option value="tiered">4개 계층</option></select></label>
+      <label>중간에 task 정지<select id="failure"><option value="none">없음</option><option value="one">1개 정지</option></select></label>
+    </div>
+    <div class="buttons">
+      <button class="primary" id="run">현재 조건 비교</button>
+      <button data-preset="small">8개 · 동일</button>
+      <button data-preset="mixed">32개 · 혼합</button>
+      <button data-preset="tight">32개 · deadline 직전 갱신</button>
+      <button data-preset="tiny">256개 · 매우 짧은 minimum</button>
+      <button data-preset="burst">256개 · 동시</button>
+      <button data-preset="failure">32개 · 1개 정지</button>
+    </div>
+  </section>
+
+  <section class="panel" aria-live="polite">
+    <h2>전체 상태</h2>
+    <div id="facts" class="facts"></div>
+    <div style="overflow:auto;margin-top:14px"><table>
+      <thead><tr><th>방식</th><th>keepalive hot-path</th><th>tick/root 확인</th><th>deadline 유지보수</th><th>동기화 진입</th><th>최악 한 tick 작업</th><th>장애 감지</th></tr></thead>
+      <tbody id="results"></tbody>
+    </table></div>
+    <p id="verdict" class="verdict"></p>
+  </section>
+
+  <section class="panel">
+    <h2>Guided walkthroughs</h2>
+    <div class="tabs">
+      <button class="tab" data-tab="steady" aria-selected="true">작은 균일 집합</button>
+      <button class="tab" data-tab="hetero" aria-selected="false">timeout 혼합</button>
+      <button class="tab" data-tab="burst" aria-selected="false">동시 deadline</button>
+    </div>
+    <div id="steady" class="walkthrough">
+      <p>등록 수가 작고 timeout이 비슷할 때 전체 scan의 고정 비용과 heap 유지비를 비교합니다.</p>
+      <button class="step active" data-guide-preset="small">1. 8개 task로 시작</button>
+      <button class="step" data-guide-preset="failure">2. 한 task의 진행을 멈춤</button>
+    </div>
+    <div id="hetero" class="walkthrough" hidden>
+      <p>짧은 timeout 하나 때문에 긴 timeout task까지 매번 검사할 때 lazy heap이 이기는지 봅니다.</p>
+      <button class="step active" data-guide-preset="mixed">1. 1개 빠름, 31개 느림</button>
+      <button class="step" data-guide-preset="tiny">2. 매우 짧은 minimum 하나</button>
+      <button class="step" data-guide-preset="tight">3. deadline 직전에 갱신</button>
+      <button class="step" data-guide-preset="small">4. 충분한 여유와 비교</button>
+    </div>
+    <div id="burst" class="walkthrough" hidden>
+      <p>모든 deadline이 같은 tick에 몰리면 lazy heap의 root repair가 ISR 한 번에 집중되는 것을 확인합니다.</p>
+      <button class="step active" data-guide-preset="burst">1. 256개 동시 deadline</button>
+      <button class="step" data-guide-preset="mixed">2. deadline을 분산</button>
+    </div>
+  </section>
+</main>
+
+<script id="logic">
+globalThis.DeadlinePrototype = (() => {
+  const freshMetrics = name => ({ name, hot:0, tick:0, maintenance:0, sync:0, worst:0, detected:null });
+
+  function taskShape(config, index) {
+    let scale = 1;
+    if (config.profile === 'one-fast' && index > 0) scale = 10;
+    if (config.profile === 'one-tiny' && index > 0) scale = 100;
+    if (config.profile === 'tiered') scale = 1 << (index % 4);
+    const period = config.periodMs * scale;
+    const timeout = config.timeoutMs * scale;
+    const phase = config.phase === 'aligned' ? 0 : Math.floor((index * config.periodMs) / config.tasks);
+    return { id:index, period, timeout, deadline:timeout + phase, nextKick:period + phase };
+  }
+
+  function siftDown(heap, positions, at, metrics, bucket) {
+    const n = heap.length;
+    for (;;) {
+      let best = at;
+      const left = at * 2 + 1;
+      const right = left + 1;
+      if (left < n) { metrics[bucket]++; if (heap[left].key < heap[best].key) best = left; }
+      if (right < n) { metrics[bucket]++; if (heap[right].key < heap[best].key) best = right; }
+      if (best === at) return;
+      const tmp = heap[at]; heap[at] = heap[best]; heap[best] = tmp;
+      metrics[bucket] += 3;
+      if (positions) { positions[heap[at].id] = at; positions[heap[best].id] = best; }
+      at = best;
+    }
+  }
+
+  function makeHeap(tasks) {
+    const heap = tasks.map(t => ({ id:t.id, key:t.deadline }));
+    heap.sort((a,b) => a.key - b.key || a.id - b.id);
+    const positions = Array(tasks.length);
+    heap.forEach((node,i) => { positions[node.id] = i; });
+    return { heap, positions };
+  }
+
+  function runFlat(config, probes, name) {
+    const tasks = Array.from({length:config.tasks}, (_,i) => taskShape(config,i));
+    const m = freshMetrics(name);
+    let cachedMin = Math.min(...tasks.map(t => t.deadline));
+    for (let now=0; now<=config.durationMs; now++) {
+      for (const task of tasks) {
+        if (now === task.nextKick && !(config.failure === 'one' && task.id === 0 && now >= config.failureAt)) {
+          task.deadline = now + task.timeout; task.nextKick += task.period; m.hot++;
+        }
+      }
+      m.tick++;
+      if (now >= cachedMin) {
+        let next = Number.POSITIVE_INFINITY;
+        let expired = false;
+        for (const task of tasks) { m.maintenance++; if (task.deadline <= now) expired = true; else if (task.deadline < next) next = task.deadline; }
+        m.maintenance += probes - tasks.length;
+        m.worst = Math.max(m.worst, probes);
+        if (expired) { m.detected = now; break; }
+        cachedMin = next;
+      }
+    }
+    return m;
+  }
+
+  function runEager(config) {
+    const tasks = Array.from({length:config.tasks}, (_,i) => taskShape(config,i));
+    const {heap, positions} = makeHeap(tasks);
+    const m = freshMetrics('Writer-mutated exact heap');
+    for (let now=0; now<=config.durationMs; now++) {
+      for (const task of tasks) {
+        if (now === task.nextKick && !(config.failure === 'one' && task.id === 0 && now >= config.failureAt)) {
+          task.deadline = now + task.timeout; task.nextKick += task.period; m.hot++; m.sync++;
+          const pos = positions[task.id]; heap[pos].key = task.deadline;
+          const before = m.hot; siftDown(heap, positions, pos, m, 'hot');
+          m.worst = Math.max(m.worst, m.hot - before + 1);
+        }
+      }
+      m.tick++;
+      if (heap[0].key <= now) { m.detected = now; break; }
+    }
+    return m;
+  }
+
+  function runLazy(config) {
+    const tasks = Array.from({length:config.tasks}, (_,i) => taskShape(config,i));
+    const {heap} = makeHeap(tasks);
+    const m = freshMetrics('ISR-owned lazy heap');
+    for (let now=0; now<=config.durationMs; now++) {
+      for (const task of tasks) {
+        if (now === task.nextKick && !(config.failure === 'one' && task.id === 0 && now >= config.failureAt)) {
+          task.deadline = now + task.timeout; task.nextKick += task.period; m.hot++;
+        }
+      }
+      m.tick++;
+      let burst = 0;
+      while (heap[0].key <= now) {
+        const root = heap[0];
+        if (tasks[root.id].deadline <= now) { m.detected = now; burst++; break; }
+        root.key = tasks[root.id].deadline; m.maintenance++; burst++;
+        siftDown(heap, null, 0, m, 'maintenance');
+      }
+      m.worst = Math.max(m.worst, burst);
+      if (m.detected !== null) break;
+    }
+    return m;
+  }
+
+  function simulate(input) {
+    const config = {...input, failureAt:Math.floor(input.durationMs / 2)};
+    const rows = [
+      runFlat(config, 256, 'Cached min + 256 source slots'),
+      runFlat(config, config.tasks, 'Cached min + active-index scan'),
+      runEager(config),
+      runLazy(config)
+    ];
+    const flat = rows[1], lazy = rows[3];
+    let verdict;
+    if (lazy.maintenance < flat.maintenance * 0.7 && lazy.worst < config.tasks / 2) {
+      verdict = 'timeout이 크게 섞인 현재 조건에서는 lazy heap이 active-index scan 유지비를 줄입니다. 다만 heap은 source of truth가 아니라 ISR 전용 cache여야 합니다.';
+    } else if (lazy.worst >= config.tasks / 2) {
+      verdict = 'deadline이 몰리면 lazy heap repair가 한 tick에 집중됩니다. 이 조건에서는 flat scan이 더 단순하고 최악 비용도 더 작습니다.';
+    } else {
+      verdict = '현재 조건에서는 flat scan의 선형·고정 상한이 heap repair보다 경쟁력 있습니다. 등록 수와 timeout 분산이 커져야 lazy heap의 이점이 나타납니다.';
+    }
+    return {config, rows, verdict};
+  }
+
+  return { simulate };
+})();
+</script>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const presets = {
+    small:{tasks:8, timeoutMs:3000, periodMs:500, durationMs:12000, phase:'staggered', profile:'uniform', failure:'none'},
+    mixed:{tasks:32, timeoutMs:1000, periodMs:250, durationMs:16000, phase:'staggered', profile:'one-fast', failure:'none'},
+    tight:{tasks:32, timeoutMs:1000, periodMs:900, durationMs:12000, phase:'staggered', profile:'uniform', failure:'none'},
+    tiny:{tasks:256, timeoutMs:20, periodMs:10, durationMs:5000, phase:'staggered', profile:'one-tiny', failure:'none'},
+    burst:{tasks:256, timeoutMs:3000, periodMs:500, durationMs:12000, phase:'aligned', profile:'uniform', failure:'none'},
+    failure:{tasks:32, timeoutMs:2000, periodMs:400, durationMs:12000, phase:'staggered', profile:'uniform', failure:'one'}
+  };
+  let current;
+
+  function read() { return {tasks:+$('tasks').value, timeoutMs:+$('timeout').value, periodMs:+$('period').value, durationMs:+$('duration').value, phase:$('phase').value, profile:$('profile').value, failure:$('failure').value}; }
+  function load(c) { $('tasks').value=c.tasks; $('timeout').value=c.timeoutMs; $('period').value=c.periodMs; $('duration').value=c.durationMs; $('phase').value=c.phase; $('profile').value=c.profile; $('failure').value=c.failure; run(); }
+  const fmt = n => n.toLocaleString('ko-KR');
+  function run() {
+    current = DeadlinePrototype.simulate(read());
+    const c = current.config;
+    $('facts').innerHTML = `
+      <div class="fact"><span>source slot / 등록</span><strong>256 / ${fmt(c.tasks)}</strong></div>
+      <div class="fact"><span>tick 횟수</span><strong>${fmt(c.durationMs + 1)}</strong></div>
+      <div class="fact"><span>timeout 구성</span><strong>${c.profile}</strong></div>
+      <div class="fact"><span>deadline 분포</span><strong>${c.phase}</strong></div>`;
+    $('results').innerHTML = current.rows.map(r => `<tr>
+      <td><strong>${r.name}</strong></td><td>${fmt(r.hot)}</td><td>${fmt(r.tick)}</td><td>${fmt(r.maintenance)}</td>
+      <td>${fmt(r.sync)}</td><td>${fmt(r.worst)}</td><td>${r.detected === null ? '정상' : fmt(r.detected)+' ms'}</td></tr>`).join('');
+    $('verdict').textContent = current.verdict;
+  }
+
+  $('run').addEventListener('click', run);
+  document.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', () => load(presets[b.dataset.preset])));
+  document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', String(t === tab)));
+    document.querySelectorAll('.walkthrough').forEach(w => { w.hidden = w.id !== tab.dataset.tab; });
+  }));
+  document.querySelectorAll('[data-guide-preset]').forEach(step => step.addEventListener('click', () => {
+    load(presets[step.dataset.guidePreset]);
+    const steps = [...step.parentElement.querySelectorAll('.step')];
+    steps.forEach(s => s.classList.remove('active'));
+    const next = steps[(steps.indexOf(step)+1) % steps.length]; next.classList.add('active');
+  }));
+  run();
+})();
+</script>
+</body>
+</html>
