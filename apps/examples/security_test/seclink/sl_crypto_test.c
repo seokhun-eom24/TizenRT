@@ -64,6 +64,10 @@ typedef enum {
 
 #define ST_AES_ENC_KEY_IDX 32
 #define ST_AES_DEC_KEY_IDX 33
+#define ST_AES_BLOCK_SIZE 16
+#define ST_AES_FACTORY_KEY_IDX 1
+#define ST_AES_STG_INPUT_LEN 5120
+#define ST_AES_STG_BUFFER_LEN (ST_AES_STG_INPUT_LEN + ST_AES_BLOCK_SIZE)
 sl_ctx g_hnd;
 char g_key_128[16] = {0,};
 char g_key_192[24] = {0,};
@@ -110,6 +114,86 @@ START_TEST_F(aes_ecb)
 
 	ST_EXPECT_EQ(SECLINK_OK, sl_remove_key(g_hnd, HAL_KEY_AES_128, ST_AES_ENC_KEY_IDX));
 	ST_EXPECT_EQ(SECLINK_OK, sl_remove_key(g_hnd, HAL_KEY_AES_128, ST_AES_DEC_KEY_IDX));
+}
+END_TEST_F
+
+/**
+ * @testcase         aes_long_input
+ * @brief            decrypt STG-sized AES NOPAD inputs through seclink
+ * @scenario         cover aligned and unaligned inputs around 5120 bytes
+ * @apicovered       sl_aes_decrypt
+ *
+ * The public security API has a 4096-byte scratch output buffer.  Use the
+ * direct seclink API so the test isolates the secure-engine result mapping.
+ * ECB_NOPAD accepts non-aligned input on this target, while CBC_NOPAD maps
+ * non-aligned input to SECLINK_INVALID_ARGS.
+ */
+START_TEST_F(aes_long_input)
+{
+	static const hal_aes_algo mode_table[] = {
+		HAL_AES_ECB_NOPAD,
+		HAL_AES_CBC_NOPAD,
+	};
+	static const unsigned int input_len_table[] = {
+		ST_AES_STG_INPUT_LEN,
+		ST_AES_STG_BUFFER_LEN,
+		ST_AES_STG_INPUT_LEN - 1,
+		ST_AES_STG_INPUT_LEN + 1,
+		ST_AES_STG_BUFFER_LEN - 1,
+	};
+	unsigned char iv[ST_AES_BLOCK_SIZE] = {0, };
+	hal_data input = HAL_DATA_INITIALIZER;
+	hal_data output = HAL_DATA_INITIALIZER;
+
+	if (sl_test_malloc_buffer(&input, ST_AES_STG_BUFFER_LEN) != 0 ||
+		sl_test_malloc_buffer(&output, ST_AES_STG_BUFFER_LEN) != 0) {
+		printf("[AES long input] buffer allocation failed\n");
+		st_res = STRESS_TC_FAIL;
+		goto cleanup;
+	}
+
+	for (unsigned int i = 0; i < ST_AES_STG_BUFFER_LEN; i++) {
+		((unsigned char *)input.data)[i] = (unsigned char)('A' + (i % 26));
+	}
+
+	for (unsigned int mode_idx = 0;
+		 mode_idx < sizeof(mode_table) / sizeof(mode_table[0]);
+		 mode_idx++) {
+		for (unsigned int len_idx = 0;
+			 len_idx < sizeof(input_len_table) / sizeof(input_len_table[0]);
+			 len_idx++) {
+			unsigned int input_len = input_len_table[len_idx];
+			int expected_res = (mode_table[mode_idx] == HAL_AES_CBC_NOPAD &&
+							input_len % ST_AES_BLOCK_SIZE != 0) ?
+							SECLINK_INVALID_ARGS : SECLINK_OK;
+			int res;
+
+			HAL_INIT_AES_PARAM(param);
+			param.mode = mode_table[mode_idx];
+			param.iv = iv;
+			param.iv_len = sizeof(iv);
+			input.data_len = input_len;
+			output.data_len = ST_AES_STG_BUFFER_LEN;
+			memset(iv, 0, sizeof(iv));
+
+			printf("[AES long input] begin mode=%d length=%u mod16=%u\n",
+				   param.mode, input_len, input_len % ST_AES_BLOCK_SIZE);
+			res = sl_aes_decrypt(g_hnd, &input, &param,
+							 ST_AES_FACTORY_KEY_IDX, &output);
+			printf("[AES long input] result mode=%d length=%u mod16=%u result=%d\n",
+				   param.mode, input_len, input_len % ST_AES_BLOCK_SIZE, res);
+			if (res != expected_res) {
+				printf("[AES long input] expected=%d result=%d\n",
+					   expected_res, res);
+				st_res = STRESS_TC_FAIL;
+				goto cleanup;
+			}
+		}
+	}
+
+cleanup:
+	sl_test_free_buffer(&input);
+	sl_test_free_buffer(&output);
 }
 END_TEST_F
 
@@ -250,6 +334,11 @@ END_TEST_F
 void sl_handle_crypto_aes_ecb(sl_options *opt)
 {
 	ST_SET_SMOKE1(sl_crypto, opt->count, 0, "aes test", aes_ecb);
+}
+
+void sl_handle_crypto_aes_long_input(sl_options *opt)
+{
+	ST_SET_SMOKE1(sl_crypto, opt->count, 0, "aes long input test", aes_long_input);
 }
 
 void sl_handle_crypto_aes_cbc(sl_options *opt)

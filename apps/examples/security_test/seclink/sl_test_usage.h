@@ -39,7 +39,9 @@
 	"        delete: test delete operation\n"
 
 #define SL_CRYPTO_USAGE                              \
-	"\n crypto test (Not supported yet)\n"
+	"\n crypto test\n"                             \
+	"    TASH> sl_test crypto [operation] [count]\n" \
+	"        aes_long_input: test STG-sized AES input\n"
 
 #define SL_KEY_USAGE													\
 	"\n key test (Not supported yet)\n"

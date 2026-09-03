@@ -17,6 +17,7 @@
  ****************************************************************************/
 // command, type, handler
 SL_CRYPTO_TEST_POOL("aes_ecb", SL_CRYPTO_TYPE_AES_ECB, sl_handle_crypto_aes_ecb)
+SL_CRYPTO_TEST_POOL("aes_long_input", SL_CRYPTO_TYPE_AES_LONG_INPUT, sl_handle_crypto_aes_long_input)
 SL_CRYPTO_TEST_POOL("aes_cbc", SL_CRYPTO_TYPE_AES_CBC, sl_handle_crypto_aes_cbc)
 SL_CRYPTO_TEST_POOL("aes_cfb128", SL_CRYPTO_TYPE_AES_CFB128, sl_handle_crypto_aes_cfb128)
 SL_CRYPTO_TEST_POOL("aes_ctr", SL_CRYPTO_TYPE_AES_CTR, sl_handle_crypto_aes_ctr)
